@@ -29,27 +29,7 @@ export class PostgreSqlArtifactRepository {
     const tokenDigest = sha256(token);
     return withTransaction(this.pool, async (client) => {
       const result = await client.query(
-        `UPDATE aarulya_store.download_grants g
-         SET consumed_at = now()
-         FROM aarulya_store.app_versions v, aarulya_store.apps a
-         WHERE g.id = $1
-           AND g.token_sha256 = $2
-           AND g.consumed_at IS NULL
-           AND g.expires_at > now()
-           AND v.id = g.app_version_id
-           AND a.id = v.app_id
-           AND v.status = 'published'
-           AND v.revoked_at IS NULL
-           AND NOT EXISTS (
-             SELECT 1 FROM aarulya_store.distribution_kill_switches k
-             WHERE k.disabled = true
-               AND (k.expires_at IS NULL OR k.expires_at > now())
-               AND ((k.scope_type = 'global' AND k.scope_id = 'downloads')
-                 OR (k.scope_type = 'package' AND k.scope_id = a.package_id))
-           )
-         RETURNING g.id, v.id AS release_id, v.apk_object_key, v.apk_sha256,
-                   v.apk_size_bytes, a.package_id, v.version_code,
-                   v.signer_fingerprint, v.signing_key_id`,
+        `SELECT * FROM aarulya_store.consume_download_grant($1::uuid, $2::text)`,
         [grantId, tokenDigest]
       );
       const row = result.rows[0];
@@ -59,9 +39,9 @@ export class PostgreSqlArtifactRepository {
         throw error;
       }
       return Object.freeze({
-        grantId: String(row.id),
+        grantId: String(row.grant_id),
         releaseId: String(row.release_id),
-        objectKey: row.apk_object_key,
+        objectKey: row.object_key,
         apkSha256: row.apk_sha256,
         apkSizeBytes: row.apk_size_bytes ? Number(row.apk_size_bytes) : null,
         packageId: row.package_id,
