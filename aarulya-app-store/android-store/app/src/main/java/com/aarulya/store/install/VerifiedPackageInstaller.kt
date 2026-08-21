@@ -4,15 +4,18 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
+import com.aarulya.store.storage.StoreStateDatabase
 import java.io.File
 import java.io.FileInputStream
 
 class VerifiedPackageInstaller(
     private val context: Context,
-    private val verifier: VerifiedApkVerifier = VerifiedApkVerifier(context)
+    private val verifier: VerifiedApkVerifier = VerifiedApkVerifier(context),
+    private val stateDatabase: StoreStateDatabase = StoreStateDatabase(context)
 ) {
     companion object {
         const val ACTION_INSTALL_STATUS = "com.aarulya.store.INSTALL_STATUS"
+        const val EXTRA_AARULYA_SESSION_ID = "aarulya_session_id"
     }
 
     fun beginInstall(
@@ -26,9 +29,7 @@ class VerifiedPackageInstaller(
         }
 
         val verification = verifier.verify(apk, expected)
-        if (!verification.valid) {
-            return Result.failure(SecurityException(verification.errors.joinToString(",")))
-        }
+        if (!verification.valid) return Result.failure(SecurityException(verification.errors.joinToString(",")))
 
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
@@ -47,7 +48,17 @@ class VerifiedPackageInstaller(
                     }
                 }
 
-                val callbackIntent = Intent(ACTION_INSTALL_STATUS).setPackage(context.packageName)
+                stateDatabase.recordPrepared(
+                    sessionId = sessionId,
+                    packageId = expected.packageId,
+                    versionCode = expected.versionCode,
+                    apkSha256 = expected.apkSha256.lowercase(),
+                    signerSha256 = expected.signerCertificateSha256.lowercase()
+                )
+
+                val callbackIntent = Intent(ACTION_INSTALL_STATUS)
+                    .setPackage(context.packageName)
+                    .putExtra(EXTRA_AARULYA_SESSION_ID, sessionId)
                 val pendingIntent = PendingIntent.getBroadcast(
                     context,
                     sessionId,
@@ -58,6 +69,7 @@ class VerifiedPackageInstaller(
             }
         } catch (error: Throwable) {
             runCatching { installer.abandonSession(sessionId) }
+            stateDatabase.updateStatus(sessionId, PackageInstaller.STATUS_FAILURE, error.javaClass.simpleName)
             return Result.failure(error)
         }
 
