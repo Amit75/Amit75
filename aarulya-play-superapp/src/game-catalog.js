@@ -28,7 +28,17 @@ export const GAME_CATALOG = Object.freeze([
   { id: 'drawing-quest', name: 'Aarulya Drawing Quest', engine: 'creative-drawing', flagship: false, status: 'planned', age: '5+', mode: 'drawing-missions', durationSeconds: 180 },
   { id: 'math-adventure', name: 'Aarulya Math Adventure', engine: 'learning-puzzle', flagship: false, status: 'planned', age: '7+', mode: 'level-challenge', durationSeconds: 150 },
   { id: 'hide-seek-party', name: 'Aarulya Hide & Seek Party', engine: 'party-stealth', flagship: false, status: 'planned', age: '7+', mode: 'bot-party', durationSeconds: 180 },
-  { id: 'monster-merge', name: 'Aarulya Monster Merge', engine: 'merge-puzzle', flagship: false, status: 'planned', age: '5+', mode: 'score-battle', durationSeconds: 150 }
+  { id: 'monster-merge', name: 'Aarulya Monster Merge', engine: 'merge-puzzle', flagship: false, status: 'planned', age: '5+', mode: 'score-battle', durationSeconds: 150 },
+  { id: 'water-sort', name: 'Aarulya Water Sort', engine: 'sorting-puzzle', flagship: false, status: 'planned', age: '7+', mode: 'level-puzzle', durationSeconds: 150 },
+  { id: 'word-builder', name: 'Aarulya Word Builder', engine: 'word-learning', flagship: false, status: 'planned', age: '7+', mode: 'word-challenge', durationSeconds: 150 },
+  { id: 'space-explorer', name: 'Aarulya Space Explorer', engine: 'space-arcade', flagship: false, status: 'planned', age: '7+', mode: 'mission-run', durationSeconds: 180 },
+  { id: 'robot-lab', name: 'Aarulya Robot Lab', engine: 'logic-coding', flagship: false, status: 'planned', age: '7+', mode: 'logic-missions', durationSeconds: 180 },
+  { id: 'city-driver', name: 'Aarulya City Driver', engine: 'driving-simulation', flagship: false, status: 'planned', age: '7+', mode: 'delivery-missions', durationSeconds: 240 },
+  { id: 'school-adventure', name: 'Aarulya School Adventure', engine: 'school-simulation', flagship: false, status: 'planned', age: '7+', mode: 'safe-story-missions', durationSeconds: 240 },
+  { id: 'music-beat', name: 'Aarulya Music Beat', engine: 'rhythm', flagship: false, status: 'planned', age: '7+', mode: 'beat-challenge', durationSeconds: 120 },
+  { id: 'home-designer', name: 'Aarulya Home Designer', engine: 'interior-design', flagship: false, status: 'planned', age: '7+', mode: 'design-missions', durationSeconds: 240 },
+  { id: 'rescue-heroes', name: 'Aarulya Rescue Heroes', engine: 'rescue-simulation', flagship: false, status: 'planned', age: '7+', mode: 'team-missions', durationSeconds: 180 },
+  { id: 'dino-park', name: 'Aarulya Dino Park', engine: 'park-management', flagship: false, status: 'planned', age: '7+', mode: 'care-and-build', durationSeconds: 240 }
 ]);
 
 export function getGame(gameId) {
