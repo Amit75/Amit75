@@ -3,6 +3,7 @@ import { createOidcAccessTokenVerifier, oidcConfigurationFromEnvironment } from 
 import { createPostgresPool, closePostgresPool } from './postgres.js';
 import { PostgreSqlStoreRepository } from './postgres-store-repository.js';
 import { PostgreSqlJobRepository } from './postgres-job-repository.js';
+import { PostgreSqlReleaseEnvelopeRepository } from './release-envelope-repository.js';
 import { createPersistentStoreService } from './persistent-store-service.js';
 
 export function createProductionComposition({ env = process.env, catalog } = {}) {
@@ -12,6 +13,7 @@ export function createProductionComposition({ env = process.env, catalog } = {})
     downloadOrigin: 'https://downloads.store.aarulya.com'
   });
   const jobRepository = new PostgreSqlJobRepository(pool);
+  const releaseEnvelopeRepository = new PostgreSqlReleaseEnvelopeRepository(pool);
   const oidc = createOidcAccessTokenVerifier(oidcConfigurationFromEnvironment(env));
   const bearer = createBearerAuthenticator({
     verifyAccessToken: oidc.verifyAccessToken,
@@ -41,6 +43,7 @@ export function createProductionComposition({ env = process.env, catalog } = {})
     pool,
     storeRepository,
     jobRepository,
+    releaseEnvelopeRepository,
     service,
     authenticate,
     async close() {
