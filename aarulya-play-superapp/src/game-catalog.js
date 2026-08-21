@@ -18,7 +18,17 @@ export const GAME_CATALOG = Object.freeze([
   { id: 'basketball-shot', name: 'Aarulya Basketball Shot', engine: 'sports-aim', flagship: false, status: 'planned', age: '7+', mode: 'ten-shot-battle', durationSeconds: 90 },
   { id: 'treasure-tower', name: 'Aarulya Treasure Tower', engine: 'risk-puzzle', flagship: false, status: 'planned', age: '7+', mode: 'level-battle', durationSeconds: 150 },
   { id: 'pattern-recall', name: 'Aarulya Pattern Recall', engine: 'memory-reflex', flagship: false, status: 'planned', age: '5+', mode: 'round-battle', durationSeconds: 90 },
-  { id: 'mini-bike-sprint', name: 'Aarulya Mini Bike Sprint', engine: 'racing', flagship: false, status: 'planned', age: '7+', mode: 'time-trial', durationSeconds: 120 }
+  { id: 'mini-bike-sprint', name: 'Aarulya Mini Bike Sprint', engine: 'racing', flagship: false, status: 'planned', age: '7+', mode: 'time-trial', durationSeconds: 120 },
+  { id: 'craft-world', name: 'Aarulya Craft World', engine: 'sandbox-builder', flagship: false, status: 'planned', age: '7+', mode: 'creative-missions', durationSeconds: 300 },
+  { id: 'obstacle-party', name: 'Aarulya Obstacle Party', engine: 'party-platformer', flagship: false, status: 'planned', age: '7+', mode: 'elimination-rounds', durationSeconds: 180 },
+  { id: 'pet-town', name: 'Aarulya Pet Town', engine: 'pet-simulation', flagship: false, status: 'planned', age: '5+', mode: 'care-missions', durationSeconds: 180 },
+  { id: 'farm-builder', name: 'Aarulya Farm Builder', engine: 'farm-simulation', flagship: false, status: 'planned', age: '7+', mode: 'build-missions', durationSeconds: 240 },
+  { id: 'cooking-rush', name: 'Aarulya Cooking Rush', engine: 'time-management', flagship: false, status: 'planned', age: '7+', mode: 'order-challenge', durationSeconds: 150 },
+  { id: 'fashion-studio', name: 'Aarulya Fashion Studio', engine: 'customization', flagship: false, status: 'planned', age: '7+', mode: 'design-challenge', durationSeconds: 180 },
+  { id: 'drawing-quest', name: 'Aarulya Drawing Quest', engine: 'creative-drawing', flagship: false, status: 'planned', age: '5+', mode: 'drawing-missions', durationSeconds: 180 },
+  { id: 'math-adventure', name: 'Aarulya Math Adventure', engine: 'learning-puzzle', flagship: false, status: 'planned', age: '7+', mode: 'level-challenge', durationSeconds: 150 },
+  { id: 'hide-seek-party', name: 'Aarulya Hide & Seek Party', engine: 'party-stealth', flagship: false, status: 'planned', age: '7+', mode: 'bot-party', durationSeconds: 180 },
+  { id: 'monster-merge', name: 'Aarulya Monster Merge', engine: 'merge-puzzle', flagship: false, status: 'planned', age: '5+', mode: 'score-battle', durationSeconds: 150 }
 ]);
 
 export function getGame(gameId) {
