@@ -1,6 +1,6 @@
 # Aarulya App Store
 
-Aarulya App Store is an Android-first, India-focused distribution platform for Aarulya applications and, later, approved third-party developers.
+Aarulya App Store is an Android-first, India-focused distribution platform for Aarulya-owned applications. Third-party submissions remain disabled in the current foundation.
 
 ## Product structure
 
@@ -8,29 +8,48 @@ The store is one unified catalog, not a collection of separate zone stores.
 
 - One home screen
 - One universal search
-- One app detail and release flow
-- Category filters
-- Curated shelves such as Daily Essentials, Documents, Creator Tools, Games, Books & Learning, Farmer & Rural, Business, and Safety & Cloud
-- Dedicated platform apps including Aarulya Play, Aarulya Books, Aarulya Cinema, Aarulya Kisan and Aarulya Learning
-
-Books, cinema and farming are represented by dedicated apps and curated shelves inside the same store. Users do not need to enter separate store experiences.
+- For You, Top Charts, Kids and Categories discovery
+- Games, Apps, Search, Books and You navigation
+- One app-detail and verified-release flow
+- Curated shelves for daily tools, documents, creator tools, games, books, farming, business, safety and cloud
+- Dedicated platform apps including Aarulya Play, Books, Cinema, Kisan and Learning
 
 ## Current milestone
 
 - Mobile-first storefront
-- Search, category filtering, curated shelves and app detail views
+- Search, category filtering, curated shelves and app-detail views
 - First-party catalog covering utilities, media, documents, education, business, rural use, safety, cloud, books, entertainment and games
-- Install button stays disabled until a signed APK, SHA-256 checksum, privacy policy and security review are present
-- Clear distinction between `planned`, `in-development`, `review` and `published`
-- No copied APKs or third-party apps without developer authorization
+- Original Aarulya package identities and first-party release mode
+- Signing, source-provenance and update-continuity gates
+- Risk-based security requirements for every app family
+- Signed catalog and installer-integrity policy foundation
+- Transparent Top Charts rules that separate sponsored placement from organic ranking
+- Download remains disabled until an APK and all required evidence are actually verified
 
 ## Distribution model
 
-1. Aarulya creates and signs its own Android applications.
-2. Release artifacts are uploaded to Aarulya Cloud object storage.
-3. The store API publishes verified metadata and signed download URLs.
-4. Aarulya App Store client verifies package name, signer identity and SHA-256 before installation.
-5. Updates are accepted only when the package ID and signing certificate match the installed app.
+1. Aarulya creates and owns its source, package identity, assets and release metadata.
+2. Every app uses an Aarulya-controlled signing key; signing secrets stay outside source repositories and public server directories.
+3. Release artifacts are uploaded to controlled Aarulya Cloud storage.
+4. The store publishes signed catalog and release manifests.
+5. The client verifies catalog signature, release signature, APK SHA-256, package name and signer continuity before installation.
+6. Updates are accepted only when package ID, publisher, signing key ID and signer fingerprint match and the version code increases.
+7. Revoked, downgraded, expired, unsigned or hash-mismatched releases are blocked.
+
+## Security profiles
+
+Every release gets the common baseline plus all applicable risk profiles:
+
+- **Baseline:** threat model, permissions, privacy map, secret/dependency scan, static analysis, SBOM, hardened build, secure logging and incident owner.
+- **Offline utilities:** network minimization, encrypted sensitive local data, temporary-data cleanup and justified permissions.
+- **Documents/media:** safe file handling, MIME validation, malformed-file resilience, metadata and export review.
+- **Account/cloud/business:** secure tokens, session revocation, rate limits, server authorization, recovery and audit trails.
+- **Child/family:** no personalized child ads, no stranger chat, no precise child location, parental gates and deletion flow.
+- **Finance critical:** strong and step-up authentication, server transaction authorization, immutable audit, fraud/reconciliation controls and kill switch.
+- **Browser/safety critical:** input isolation, URL canonicalization, safe intents, no certificate-error bypass and signed rules.
+- **Store/installer critical:** signed manifests, hash checks, anti-rollback, signer continuity, revocation, staged rollout and download kill switches.
+
+See `docs/SECURITY_MODEL.md` for the complete policy.
 
 ## Initial first-party app families
 
@@ -45,15 +64,18 @@ Books, cinema and farming are represented by dedicated apps and curated shelves 
 
 ## Non-negotiable release rules
 
-- Every APK must be signed by its verified owner.
-- SHA-256 checksum is required.
-- Malware/static analysis result is required.
-- Privacy policy and data-safety declaration are required.
-- Copyright ownership or licence evidence is required.
+- No copied, imported, modified or re-signed third-party APK.
+- Every release must prove Aarulya source ownership and verified build provenance.
+- Every APK must use its approved package ID and Aarulya-controlled signer.
+- APK, source archive, SBOM and asset-manifest hashes are required.
+- Malware, static/dynamic security, permission, privacy, data-safety and copyright reviews are required.
+- Dangerous permissions require written user-facing justification.
+- Embedded secrets, debug releases, demo credentials and known critical vulnerabilities block publication.
+- Vulnerability disclosure, verified security contact, incident response and tested rollback are required.
 - Books and films must be original, licensed or verified public-domain content.
-- Child-directed apps require child-safety review.
-- Ads must follow the app's age mode and may not interrupt active gameplay or core tasks.
+- Child-directed and finance apps require their additional high-risk controls.
+- Ads must follow age mode and may not interrupt active gameplay or essential tasks.
 
 ## State
 
-This branch contains the store foundation and planned first-party catalog. It is not yet deployed to Aarulya Cloud and does not claim that planned apps are complete.
+This branch contains the store, catalog, signing, ranking and security-policy foundation. It is not deployed to Aarulya Cloud and does not claim that any planned app, APK, security scanner, signing service or installer is complete.
