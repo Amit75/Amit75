@@ -23,5 +23,9 @@
             </intent-filter>
         </activity>
 
+        <receiver
+            android:name=".install.InstallStatusReceiver"
+            android:exported="false" />
+
     </application>
 </manifest>
