@@ -5,6 +5,7 @@ import { evaluateAttestationSet } from './attestation-policy.js';
 import { evaluateRuntimeSecurity } from './runtime-security.js';
 import { evaluatePrivacy } from './privacy-policy.js';
 import { evaluateAbuseResilience } from './abuse-resilience.js';
+import { evaluateAndroidPermissionPrivacy } from './android-permission-privacy.js';
 
 const SHA256 = /^[a-f0-9]{64}$/i;
 
@@ -23,6 +24,7 @@ export function buildReleaseEvidenceReport(app = {}, options = {}) {
   const attestations = evaluateAttestationSet({ ...app, sovereignAssuranceTier: assurance.tier });
   const runtime = evaluateRuntimeSecurity(app);
   const privacy = evaluatePrivacy(app);
+  const androidPrivacy = evaluateAndroidPermissionPrivacy(app);
   const abuse = evaluateAbuseResilience(app);
 
   const sections = Object.freeze([
@@ -32,6 +34,7 @@ export function buildReleaseEvidenceReport(app = {}, options = {}) {
     summarizeSection('signed-attestations', attestations),
     summarizeSection('runtime-security', runtime),
     summarizeSection('privacy-and-data-protection', privacy),
+    summarizeSection('android-permissions-and-user-consent', androidPrivacy),
     summarizeSection('abuse-and-fraud-resilience', abuse)
   ]);
 
@@ -45,7 +48,7 @@ export function buildReleaseEvidenceReport(app = {}, options = {}) {
     && app.reportEvidenceFrozen === true;
 
   return Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: 2,
     reportId: options.reportId || null,
     generatedAt: options.generatedAt || null,
     publisher: app.publisher || null,
@@ -65,6 +68,8 @@ export function buildReleaseEvidenceReport(app = {}, options = {}) {
     ownershipEvidenceCount: ownership.evidenceCount,
     signedAttestationCount: attestations.attestationCount,
     assuranceTier: assurance.tier,
+    androidDeclaredPermissions: androidPrivacy.declaredPermissions,
+    androidSensitivePermissions: androidPrivacy.sensitivePermissions,
     sections,
     reportReady,
     releaseEligible: reportReady,
