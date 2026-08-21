@@ -1,5 +1,6 @@
 import { GAME_CATALOG, getGame } from './game-catalog.js';
 import { BattleEngine } from './battle-engine.js';
+import { createPhaseTwoStarters } from './phase-two-games.js';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -32,7 +33,12 @@ const descriptions = {
   'cricket-strike': 'Timing meter पर सही hit लगाकर छह balls में highest score बनाएँ।',
   'hill-rider': 'Speed और balance संभालते हुए hill track पूरा करें।',
   'chaupar-battle': 'Quick board race में dice roll करके bot से पहले finish तक पहुँचें।',
-  'carrom-strike': 'Aim और power balance करके पांच shots में pockets score करें।'
+  'carrom-strike': 'Aim और power balance करके पांच shots में pockets score करें।',
+  'block-puzzle': 'Pieces रखें, rows और columns clear करें और bot score को beat करें।',
+  'goal-master': 'पांच penalty shots में सही goal zones चुनकर match जीतें।',
+  'color-dash': 'Hindi colour prompt देखकर सही tile पर तेज tap करें।',
+  'memory-battle': 'Cards पलटकर matching pairs खोजें और समय के भीतर board पूरा करें।',
+  'bubble-arena': 'एक जैसे जुड़े bubbles pop करके combo score बनाएँ।'
 };
 
 const arena = $('#arena');
@@ -108,14 +114,34 @@ function openGame(gameId) {
   footer.innerHTML = '';
   arena.showModal();
 
+  const phaseTwo = createPhaseTwoStarters({
+    battle,
+    stage,
+    footer,
+    $,
+    $$,
+    setScores,
+    finishBattle,
+    startCountdown,
+    setCleanup: (handler) => { cleanup = handler; }
+  });
+
   const starters = {
     'metro-dash': startMetroDash,
     'cricket-strike': startCricketStrike,
     'hill-rider': startHillRider,
     'chaupar-battle': startChaupar,
-    'carrom-strike': startCarrom
+    'carrom-strike': startCarrom,
+    ...phaseTwo
   };
-  starters[gameId](game);
+
+  const starter = starters[gameId];
+  if (!starter) {
+    toast('यह game अभी production queue में है।');
+    arena.close();
+    return;
+  }
+  starter(game);
 }
 
 function finishBattle(playerScore, botScore, message) {
