@@ -10,11 +10,14 @@ data class StoreApp(
     val sizeLabel: String,
     val trustLabel: String,
     val statusLabel: String,
-    val featured: Boolean = false
+    val featured: Boolean = false,
+    val versionCode: Long? = null,
+    val verifiedReleaseAvailable: Boolean = false,
+    val source: String = "planned-source-record"
 )
 
 object StoreCatalog {
-    private val apps = listOf(
+    private val plannedApps = listOf(
         StoreApp("store", "Aarulya Store", "Apps", "Verified Aarulya apps, secure updates and privacy-first installation.", "com.aarulya.store", "Everyone", "Target pending", "Verification pending", "In development", true),
         StoreApp("saathi", "Aarulya Saathi", "AI & Productivity", "Personal work, files, projects, research and safe actions in one assistant.", "com.aarulya.saathi", "Teen+", "Target pending", "Evidence required", "Planned", true),
         StoreApp("play", "Aarulya Play", "Games", "Original family games, short battles, rewards and child-safe play modes.", "com.aarulya.play", "Family", "Target pending", "Evidence required", "Source foundation", true),
@@ -30,42 +33,53 @@ object StoreCatalog {
         StoreApp("cloud", "Aarulya Cloud", "Cloud", "Owner-controlled files, backups and governed cloud services.", "com.aarulya.cloud", "Teen+", "Target pending", "Critical review", "Planned")
     )
 
+    @Volatile
+    private var authenticatedRemoteApps: List<StoreApp>? = null
+
     val topTabs: List<String> = listOf("For You", "Top Charts", "Kids", "Categories")
     val bottomDestinations: List<String> = listOf("Games", "Apps", "Search", "Books", "You")
     val categories: List<String> = listOf(
-        "Apps",
-        "Games",
-        "AI & Productivity",
-        "Photo & Video",
-        "Documents & PDF",
-        "Student & Learning",
-        "Farmer",
-        "Business",
-        "Books",
-        "Cinema & Media",
-        "Safety",
-        "Cloud",
-        "Internet"
+        "Apps", "Games", "AI & Productivity", "Photo & Video", "Documents & PDF",
+        "Student & Learning", "Farmer", "Business", "Books", "Cinema & Media",
+        "Safety", "Cloud", "Internet"
     )
 
-    fun all(): List<StoreApp> = apps
+    private fun snapshot(): List<StoreApp> = authenticatedRemoteApps ?: plannedApps
 
-    fun featured(): List<StoreApp> = apps.filter { it.featured }
+    @Synchronized
+    fun replaceAuthenticatedRemoteCatalog(apps: List<StoreApp>) {
+        require(apps.distinctBy { it.id }.size == apps.size) { "duplicate-app-id" }
+        require(apps.distinctBy { it.packageId }.size == apps.size) { "duplicate-package-id" }
+        require(apps.all { it.packageId.matches(Regex("^com\\.aarulya(?:\\.[a-z][a-z0-9_]*)+$")) }) {
+            "non-aarulya-package-rejected"
+        }
+        require(apps.all { it.source == "authenticated-api" }) { "authenticated-api-source-required" }
+        authenticatedRemoteApps = apps.toList()
+    }
 
-    fun kids(): List<StoreApp> = apps.filter { it.ageLabel == "Family" || it.ageLabel == "Everyone" }
+    @Synchronized
+    fun clearAuthenticatedRemoteCatalog() {
+        authenticatedRemoteApps = null
+    }
+
+    fun all(): List<StoreApp> = snapshot()
+
+    fun featured(): List<StoreApp> = snapshot().filter { it.featured }
+
+    fun kids(): List<StoreApp> = snapshot().filter { it.ageLabel == "Family" || it.ageLabel == "Everyone" }
 
     fun verifiedTopCharts(): List<StoreApp> = emptyList()
 
     fun forBottomDestination(destination: String): List<StoreApp> = when (destination) {
-        "Games" -> apps.filter { it.category == "Games" }
-        "Books" -> apps.filter { it.category == "Books" }
-        "Apps" -> apps.filterNot { it.category in setOf("Games", "Books", "Cinema & Media") }
-        else -> apps
+        "Games" -> snapshot().filter { it.category == "Games" }
+        "Books" -> snapshot().filter { it.category == "Books" }
+        "Apps" -> snapshot().filterNot { it.category in setOf("Games", "Books", "Cinema & Media") }
+        else -> snapshot()
     }
 
     fun search(query: String, category: String? = null): List<StoreApp> {
         val normalized = query.trim().lowercase()
-        return apps.filter { app ->
+        return snapshot().filter { app ->
             val categoryMatch = category.isNullOrBlank() || app.category == category
             val queryMatch = normalized.isBlank() || listOf(app.name, app.category, app.summary, app.packageId)
                 .joinToString(" ")
@@ -75,5 +89,5 @@ object StoreCatalog {
         }
     }
 
-    fun byId(id: String): StoreApp? = apps.firstOrNull { it.id == id }
+    fun byId(id: String): StoreApp? = snapshot().firstOrNull { it.id == id }
 }
