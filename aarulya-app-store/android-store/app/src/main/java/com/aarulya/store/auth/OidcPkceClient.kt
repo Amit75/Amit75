@@ -1,14 +1,15 @@
 package com.aarulya.store.auth
 
 import android.net.Uri
+import android.util.Base64
 import com.aarulya.store.BuildConfig
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.security.MessageDigest
 import java.security.SecureRandom
-import java.util.Base64
 
 class OidcPkceClient(private val sessionStore: SecureSessionStore) {
     private val random = SecureRandom()
@@ -16,8 +17,9 @@ class OidcPkceClient(private val sessionStore: SecureSessionStore) {
     fun createAuthorizationUri(): Uri {
         val state = randomUrlSafe(32)
         val verifier = randomUrlSafe(64)
-        val challenge = Base64.getUrlEncoder().withoutPadding().encodeToString(
-            MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII))
+        val challenge = Base64.encodeToString(
+            MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII)),
+            Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
         )
         sessionStore.savePendingAuthorization(
             PendingAuthorization(state, verifier, System.currentTimeMillis() / 1000L)
@@ -57,26 +59,38 @@ class OidcPkceClient(private val sessionStore: SecureSessionStore) {
         ).joinToString("&") { (key, value) ->
             "${URLEncoder.encode(key, Charsets.UTF_8.name())}=${URLEncoder.encode(value, Charsets.UTF_8.name())}"
         }
+        val formBytes = form.toByteArray(Charsets.UTF_8)
 
         val connection = (endpoint.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 10_000
             readTimeout = 15_000
             instanceFollowRedirects = false
+            useCaches = false
             doOutput = true
             setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
             setRequestProperty("Accept", "application/json")
-            setFixedLengthStreamingMode(form.toByteArray(Charsets.UTF_8).size)
+            setFixedLengthStreamingMode(formBytes.size)
         }
-        connection.outputStream.use { it.write(form.toByteArray(Charsets.UTF_8)) }
+        connection.outputStream.use { it.write(formBytes) }
         val status = connection.responseCode
+        if (status in 300..399) throw IllegalStateException("identity-redirect-prohibited")
         val source = if (status in 200..299) connection.inputStream else connection.errorStream
         val response = source?.use { input ->
-            val bytes = input.readNBytes(256 * 1024 + 1)
-            require(bytes.size <= 256 * 1024) { "identity-response-too-large" }
-            bytes.toString(Charsets.UTF_8)
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(4096)
+            var total = 0
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                total += read
+                require(total <= 256 * 1024) { "identity-response-too-large" }
+                output.write(buffer, 0, read)
+            }
+            output.toString(Charsets.UTF_8.name())
         }.orEmpty()
         if (status !in 200..299) throw IllegalStateException("token-exchange-failed:$status")
+        require(connection.contentType?.substringBefore(';') == "application/json") { "identity-json-response-required" }
 
         val json = JSONObject(response)
         val accessToken = json.getString("access_token")
@@ -93,6 +107,6 @@ class OidcPkceClient(private val sessionStore: SecureSessionStore) {
     }
 
     private fun randomUrlSafe(bytes: Int): String = ByteArray(bytes).also(random::nextBytes).let {
-        Base64.getUrlEncoder().withoutPadding().encodeToString(it)
+        Base64.encodeToString(it, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
     }
 }
