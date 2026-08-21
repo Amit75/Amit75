@@ -5,7 +5,7 @@ APP_DIR="/opt/aarulya/play"
 CONTAINER="aarulya-play-static"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP="/opt/aarulya/backups/aarulya-play-v3-$STAMP"
-SOURCE="https://raw.githubusercontent.com/Amit75/Amit75/main/aarulya-play-v3"
+SOURCE="https://raw.githubusercontent.com/Amit75/Amit75/710e1b12c0f6be87910619ee13b4aeb37465dfeb/aarulya-play-v3"
 
 mkdir -p "$BACKUP" "$APP_DIR"
 cp -a "$APP_DIR/." "$BACKUP/" 2>/dev/null || true
