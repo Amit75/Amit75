@@ -1,5 +1,6 @@
 import { evaluateSecurityEvidence } from './security-policy.js';
 import { evaluateSovereignAssurance } from './sovereign-assurance.js';
+import { evaluateAttestationSet } from './attestation-policy.js';
 
 const PUBLISHABLE_STATUSES = new Set(['review', 'published']);
 const HTTPS = /^https:\/\//i;
@@ -14,8 +15,10 @@ export const STORE_RELEASE_MODE = Object.freeze({
   thirdPartySubmissionEnabled: false,
   securityEvidenceRequired: true,
   sovereignAssuranceRequired: true,
+  signedAttestationsRequired: true,
   publishOnSecurityWarning: false,
-  publishOnAssuranceWarning: false
+  publishOnAssuranceWarning: false,
+  publishOnAttestationWarning: false
 });
 
 function requireAarulyaOwnership(app, errors) {
@@ -72,13 +75,21 @@ export function validateRelease(app) {
   const assurance = evaluateSovereignAssurance(app);
   if (!assurance.valid) errors.push(...assurance.errors);
 
+  const attestations = evaluateAttestationSet({
+    ...app,
+    sovereignAssuranceTier: assurance.tier
+  });
+  if (!attestations.valid) errors.push(...attestations.errors);
+
   return Object.freeze({
     valid: errors.length === 0,
     errors: Object.freeze([...new Set(errors)]),
     securityProfiles: security.profiles,
     missingSecurityEvidence: security.missingEvidence,
     sovereignAssuranceTier: assurance.tier,
-    sovereignAssuranceTarget: assurance.target
+    sovereignAssuranceTarget: assurance.target,
+    signedAttestationCount: attestations.attestationCount,
+    signedAttestationTypes: attestations.types
   });
 }
 
@@ -88,7 +99,8 @@ export function canDownload(app) {
     allowed: app?.status === 'published' && validation.valid,
     reasons: validation.errors,
     securityProfiles: validation.securityProfiles,
-    sovereignAssuranceTier: validation.sovereignAssuranceTier
+    sovereignAssuranceTier: validation.sovereignAssuranceTier,
+    signedAttestationCount: validation.signedAttestationCount
   });
 }
 
@@ -106,6 +118,7 @@ export function verifyUpdateCompatibility(installed, candidate) {
     allowed: true,
     reason: 'verified-aarulya-sovereign-update',
     securityProfiles: validation.securityProfiles,
-    sovereignAssuranceTier: validation.sovereignAssuranceTier
+    sovereignAssuranceTier: validation.sovereignAssuranceTier,
+    signedAttestationCount: validation.signedAttestationCount
   };
 }
