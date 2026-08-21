@@ -26,6 +26,17 @@ class StoreApiClient {
     fun getApp(accessToken: String, appId: String): JSONObject =
         request("GET", baseUri.buildUpon().appendPath("apps").appendPath(appId).build(), accessToken)
 
+    fun getLatestReleaseEnvelope(accessToken: String, appId: String, versionCode: Long? = null): JSONObject {
+        val uri = baseUri.buildUpon()
+            .appendPath("apps")
+            .appendPath(appId)
+            .appendPath("releases")
+            .appendPath("latest")
+            .apply { versionCode?.let { appendQueryParameter("versionCode", it.toString()) } }
+            .build()
+        return request("GET", uri, accessToken)
+    }
+
     fun resolveAction(accessToken: String, query: String): JSONObject = request(
         "POST",
         baseUri.buildUpon().appendPath("actions").appendPath("resolve").build(),
@@ -131,9 +142,7 @@ class StoreApiClient {
             output.toString(Charsets.UTF_8.name())
         }.orEmpty()
         val json = runCatching { JSONObject(raw) }.getOrElse { JSONObject() }
-        if (status !in 200..299) {
-            throw StoreApiException(status, json.optString("error", "store-api-request-failed"))
-        }
+        if (status !in 200..299) throw StoreApiException(status, json.optString("error", "store-api-request-failed"))
         return json
     }
 }
