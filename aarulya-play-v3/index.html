@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#070914">
+  <meta name="description" content="Aarulya Play — original mobile-first skill games">
+  <title>Aarulya Play</title>
+  <link rel="stylesheet" href="styles.css?v=3">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><div class="brand-mark">A</div><div><strong>Aarulya Play</strong><small>Original skill games</small></div></div>
+      <div class="wallet"><span>Virtual coins</span><strong id="coinBalance">2,500</strong></div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <span class="eyebrow">PLAY • SCORE • LEVEL UP</span>
+          <h1>अब lobby नहीं—असली playable games</h1>
+          <p>Mobile controls, animation, score, win/loss, missions और transparent rewards.</p>
+          <div class="actions"><button class="btn primary" data-game="sky">Sky Rush खेलें</button><button class="btn secondary" id="shareButton">Share करें</button></div>
+        </div>
+        <aside class="mission-card"><span>आज का मिशन</span><strong>3 games पूरा करें</strong><small>Reward: 150 virtual coins</small><div class="progress"><i id="missionProgress"></i></div><b id="missionText">0 / 3</b></aside>
+      </section>
+
+      <section class="revenue-card">
+        <div><span class="eyebrow">SELF-FUNDED REWARDS</span><h2>Referral rewards platform की कमाई से</h2><p>कोई upfront cash balance नहीं। Reward pool ads/subscription की verified net income से बनेगा। Pool खाली होने पर cash payout promise नहीं होगा।</p></div>
+        <div class="ref-box"><label>Referral code</label><div class="code-row"><code id="referralCode">AARU-PLAY</code><button id="copyCode">Copy</button></div><small>Cash payout backend verification, campaign terms और available reward pool के बाद ही activate होगा.</small></div>
+      </section>
+
+      <section class="games-section">
+        <div class="section-title"><div><span class="eyebrow">LIVE PLAYABLE</span><h2>Game Arena</h2></div><span class="pill">3 games</span></div>
+        <div class="game-grid">
+          <article class="game-card"><div class="art sky-art"><div class="planet"></div><div class="ship">▲</div><div class="laser"></div></div><div class="game-content"><span>ENDLESS RUNNER</span><h3>Aarulya Sky Rush</h3><p>Tap करके jump करें, obstacles बचाएँ और नया high score बनाएँ।</p><button class="btn primary full" data-game="sky">Play now</button></div></article>
+          <article class="game-card"><div class="art goal-art"><div class="goal-net"></div><div class="keeper">▰</div><div class="ball">●</div></div><div class="game-content"><span>SPORTS SKILL</span><h3>Goal Master</h3><p>Target चुनें, keeper को beat करें और 5 shots में match जीतें।</p><button class="btn primary full" data-game="goal">Play now</button></div></article>
+          <article class="game-card"><div class="art stack-art"><div class="preview-block p1"></div><div class="preview-block p2"></div><div class="preview-block p3"></div></div><div class="game-content"><span>TIMING CHALLENGE</span><h3>Neon Stack</h3><p>चलती block सही समय पर रोकें और सबसे ऊँची tower बनाएँ।</p><button class="btn primary full" data-game="stack">Play now</button></div></article>
+        </div>
+      </section>
+
+      <section class="roadmap"><span class="eyebrow">NEXT PREMIUM GAMES</span><h2>अगले original games</h2><div class="roadmap-grid"><div><b>Memory Battle</b><span>Fast card matching</span></div><div><b>Color Dash</b><span>Reflex challenge</span></div><div><b>Bubble Arena</b><span>Aim and match</span></div><div><b>Puzzle Kingdom</b><span>Level progression</span></div><div><b>Carrom Strike</b><span>Physics skill</span></div></div></section>
+
+      <section class="stats"><div><span>Best Sky</span><strong id="bestSky">0</strong></div><div><span>Goal wins</span><strong id="goalWins">0</strong></div><div><span>Best Stack</span><strong id="bestStack">0</strong></div><div><span>Completed</span><strong id="completedGames">0</strong></div></section>
+    </main>
+  </div>
+
+  <div class="modal" id="gameModal" aria-hidden="true"><div class="modal-panel"><div class="modal-head"><div><span class="eyebrow" id="gameCategory">GAME</span><h2 id="gameTitle">Aarulya Game</h2></div><button id="closeGame" class="close" aria-label="Close">×</button></div><div id="gameRoot"></div></div></div>
+  <div class="toast" id="toast"></div>
+  <script src="app.js?v=3" defer></script>
+</body>
+</html>
