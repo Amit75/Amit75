@@ -24,10 +24,7 @@ function writeJson(response, status, payload, requestId, origin = null) {
     'content-type': 'application/json; charset=utf-8',
     'content-length': Buffer.byteLength(body),
     'cache-control': status >= 400 ? 'no-store' : 'private, no-store',
-    ...(origin ? {
-      'access-control-allow-origin': origin,
-      vary: 'Origin'
-    } : {})
+    ...(origin ? { 'access-control-allow-origin': origin, vary: 'Origin' } : {})
   });
   response.end(body);
 }
@@ -44,7 +41,6 @@ async function readJson(request) {
     error.status = 415;
     throw error;
   }
-
   let size = 0;
   const chunks = [];
   for await (const chunk of request) {
@@ -90,9 +86,7 @@ function requireIdempotency(request) {
 }
 
 function requirementsFor(method, pathname) {
-  if (method === 'GET' && (pathname === '/api/v1/catalog' || pathname.startsWith('/api/v1/apps/'))) {
-    return { scopes: ['store:read'] };
-  }
+  if (method === 'GET' && (pathname === '/api/v1/catalog' || pathname.startsWith('/api/v1/apps/'))) return { scopes: ['store:read'] };
   if (method === 'POST' && pathname === '/api/v1/actions/resolve') return { scopes: ['store:read'] };
   if (method === 'POST' && pathname === '/api/v1/downloads/authorize') return { scopes: ['store:download'] };
   if (method === 'POST' && pathname === '/api/v1/installs/report') return { scopes: ['store:install'] };
@@ -105,11 +99,13 @@ export function createHttpHandler({
   service,
   authenticate,
   releaseRepository,
+  releaseEnvelopeRepository,
   allowedOrigins = []
 } = {}) {
   if (!service) throw new Error('store-service-required');
   if (typeof authenticate !== 'function') throw new Error('store-authenticator-required');
   if (!releaseRepository) throw new Error('release-repository-required');
+  if (!releaseEnvelopeRepository) throw new Error('release-envelope-repository-required');
   const origins = new Set(allowedOrigins);
 
   return async function handler(request, response) {
@@ -177,10 +173,20 @@ export function createHttpHandler({
         return writeJson(response, 200, result, requestId, acceptedOrigin);
       }
 
-      const appParams = method === 'GET' ? routeMatch(pathname, '/api/v1/apps/:appId') : null;
-      if (appParams) {
-        return writeJson(response, 200, await service.getApp(appParams.appId), requestId, acceptedOrigin);
+      const releaseParams = method === 'GET'
+        ? routeMatch(pathname, '/api/v1/apps/:appId/releases/latest')
+        : null;
+      if (releaseParams) {
+        const versionCode = url.searchParams.get('versionCode');
+        const envelope = await releaseEnvelopeRepository.getLatestForApp(
+          releaseParams.appId,
+          versionCode == null ? null : Number(versionCode)
+        );
+        return writeJson(response, 200, envelope, requestId, acceptedOrigin);
       }
+
+      const appParams = method === 'GET' ? routeMatch(pathname, '/api/v1/apps/:appId') : null;
+      if (appParams) return writeJson(response, 200, await service.getApp(appParams.appId), requestId, acceptedOrigin);
 
       if (method === 'POST' && pathname === '/api/v1/actions/resolve') {
         const body = await readJson(request);
@@ -222,34 +228,23 @@ export function createHttpHandler({
 
       if (method === 'POST' && pathname === '/api/v1/updates/check') {
         const body = await readJson(request);
-        const result = await service.checkUpdate(context, body);
-        return writeJson(response, 200, result, requestId, acceptedOrigin);
+        return writeJson(response, 200, await service.checkUpdate(context, body), requestId, acceptedOrigin);
       }
 
       if (method === 'POST' && pathname === '/api/v1/jobs') {
         const body = await readJson(request);
         const idempotencyKey = requireIdempotency(request);
-        const job = await service.createJob(context, { ...body, idempotencyKey });
-        return writeJson(response, 201, job, requestId, acceptedOrigin);
+        return writeJson(response, 201, await service.createJob(context, { ...body, idempotencyKey }), requestId, acceptedOrigin);
       }
 
       const jobParams = method === 'GET' ? routeMatch(pathname, '/api/v1/jobs/:jobId') : null;
-      if (jobParams) {
-        return writeJson(response, 200, await service.getJob(context, jobParams.jobId), requestId, acceptedOrigin);
-      }
+      if (jobParams) return writeJson(response, 200, await service.getJob(context, jobParams.jobId), requestId, acceptedOrigin);
 
-      const transitionParams = method === 'POST'
-        ? routeMatch(pathname, '/api/v1/jobs/:jobId/:action')
-        : null;
+      const transitionParams = method === 'POST' ? routeMatch(pathname, '/api/v1/jobs/:jobId/:action') : null;
       if (transitionParams && ['pause', 'resume', 'cancel'].includes(transitionParams.action)) {
         requireIdempotency(request);
-        const target = transitionParams.action === 'pause'
-          ? 'paused'
-          : transitionParams.action === 'resume'
-            ? 'queued'
-            : 'cancelled';
-        const job = await service.transitionJob(context, transitionParams.jobId, target, { source: 'user-api' });
-        return writeJson(response, 200, job, requestId, acceptedOrigin);
+        const target = transitionParams.action === 'pause' ? 'paused' : transitionParams.action === 'resume' ? 'queued' : 'cancelled';
+        return writeJson(response, 200, await service.transitionJob(context, transitionParams.jobId, target, { source: 'user-api' }), requestId, acceptedOrigin);
       }
 
       return writeJson(response, 404, { error: 'route-not-found', requestId }, requestId, acceptedOrigin);
