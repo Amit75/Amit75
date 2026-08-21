@@ -20,7 +20,9 @@ if (publicOrigin !== expectedOrigin) throw new Error('canonical-artifact-origin-
 const root = resolve(String(process.env.AARULYA_ARTIFACT_ROOT || ''));
 if (!process.env.AARULYA_ARTIFACT_ROOT || root === '/') throw new Error('private-artifact-root-required');
 const host = process.env.HOST || '127.0.0.1';
-if (host !== '127.0.0.1' && host !== '::1') throw new Error('artifact-service-loopback-bind-required');
+const privateContainerNetwork = process.env.AARULYA_PRIVATE_CONTAINER_NETWORK === 'true';
+const allowedBind = host === '127.0.0.1' || host === '::1' || (privateContainerNetwork && host === '0.0.0.0');
+if (!allowedBind) throw new Error('artifact-bind-must-be-loopback-or-declared-private-container-network');
 const port = Number(process.env.PORT || (downloadsMode ? 8081 : 8082));
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('valid-artifact-port-required');
 
