@@ -1,25 +1,50 @@
 import { randomUUID } from 'node:crypto';
 
 const JSON_LIMIT_BYTES = 1024 * 1024;
-const PUBLIC_GET = new Set(['/api/v1/catalog']);
+const REQUEST_ID = /^[A-Za-z0-9._:-]{8,128}$/;
+const ALLOWED_METHODS = 'GET,POST,OPTIONS';
+const ALLOWED_HEADERS = 'authorization,content-type,idempotency-key,x-request-id';
 
-function writeJson(response, status, payload, requestId) {
-  const body = JSON.stringify(payload);
-  response.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8',
-    'content-length': Buffer.byteLength(body),
-    'cache-control': status >= 400 ? 'no-store' : 'private, max-age=0',
+function securityHeaders(requestId) {
+  return {
     'x-content-type-options': 'nosniff',
     'x-frame-options': 'DENY',
     'referrer-policy': 'no-referrer',
-    'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+    'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
     'content-security-policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+    'cross-origin-resource-policy': 'same-site',
     'x-request-id': requestId
+  };
+}
+
+function writeJson(response, status, payload, requestId, origin = null) {
+  const body = JSON.stringify(payload);
+  response.writeHead(status, {
+    ...securityHeaders(requestId),
+    'content-type': 'application/json; charset=utf-8',
+    'content-length': Buffer.byteLength(body),
+    'cache-control': status >= 400 ? 'no-store' : 'private, no-store',
+    ...(origin ? {
+      'access-control-allow-origin': origin,
+      vary: 'Origin'
+    } : {})
   });
   response.end(body);
 }
 
+function requestIdFor(request) {
+  const supplied = String(request.headers['x-request-id'] || '');
+  return REQUEST_ID.test(supplied) ? supplied : randomUUID();
+}
+
 async function readJson(request) {
+  const contentType = String(request.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  if (contentType !== 'application/json') {
+    const error = new Error('application-json-required');
+    error.status = 415;
+    throw error;
+  }
+
   let size = 0;
   const chunks = [];
   for await (const chunk of request) {
@@ -32,9 +57,8 @@ async function readJson(request) {
     chunks.push(chunk);
   }
   if (chunks.length === 0) return {};
-  const raw = Buffer.concat(chunks).toString('utf8');
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
     return parsed;
   } catch {
@@ -42,13 +66,6 @@ async function readJson(request) {
     error.status = 400;
     throw error;
   }
-}
-
-function bearerToken(request) {
-  const value = request.headers.authorization;
-  if (!value || !value.startsWith('Bearer ')) return null;
-  const token = value.slice(7).trim();
-  return token.length >= 24 ? token : null;
 }
 
 function routeMatch(pathname, pattern) {
@@ -63,62 +80,79 @@ function routeMatch(pathname, pattern) {
 }
 
 function requireIdempotency(request) {
-  const key = request.headers['idempotency-key'];
-  if (!key || String(key).length < 16 || String(key).length > 200) {
+  const key = String(request.headers['idempotency-key'] || '');
+  if (!/^[A-Za-z0-9._:-]{16,200}$/.test(key)) {
     const error = new Error('valid-idempotency-key-required');
     error.status = 400;
     throw error;
   }
-  return String(key);
+  return key;
+}
+
+function requirementsFor(method, pathname) {
+  if (method === 'GET' && (pathname === '/api/v1/catalog' || pathname.startsWith('/api/v1/apps/'))) {
+    return { scopes: ['store:read'] };
+  }
+  if (method === 'POST' && pathname === '/api/v1/actions/resolve') return { scopes: ['store:read'] };
+  if (method === 'POST' && pathname === '/api/v1/downloads/authorize') return { scopes: ['store:download'] };
+  if (method === 'POST' && pathname === '/api/v1/installs/report') return { scopes: ['store:install'] };
+  if (method === 'POST' && pathname === '/api/v1/updates/check') return { scopes: ['store:updates'] };
+  if (pathname.startsWith('/api/v1/jobs')) return { scopes: ['store:jobs'] };
+  return { scopes: ['store:read'] };
 }
 
 export function createHttpHandler({
   service,
-  authenticate = async () => null,
-  releaseRepository = null,
+  authenticate,
+  releaseRepository,
   allowedOrigins = []
 } = {}) {
   if (!service) throw new Error('store-service-required');
+  if (typeof authenticate !== 'function') throw new Error('store-authenticator-required');
+  if (!releaseRepository) throw new Error('release-repository-required');
   const origins = new Set(allowedOrigins);
 
   return async function handler(request, response) {
-    const requestId = String(request.headers['x-request-id'] || randomUUID());
+    const requestId = requestIdFor(request);
+    let acceptedOrigin = null;
     try {
-      const url = new URL(request.url, 'https://aarulya.invalid');
+      const url = new URL(request.url, 'https://api.store.aarulya.com');
       const pathname = url.pathname;
-      const method = request.method || 'GET';
-      const origin = request.headers.origin;
+      const method = String(request.method || 'GET').toUpperCase();
+      const origin = request.headers.origin ? String(request.headers.origin).replace(/\/$/, '') : null;
 
-      if (origin && !origins.has(origin)) {
-        const error = new Error('origin-not-allowed');
-        error.status = 403;
-        throw error;
+      if (origin) {
+        if (!origins.has(origin)) {
+          const error = new Error('origin-not-allowed');
+          error.status = 403;
+          throw error;
+        }
+        acceptedOrigin = origin;
+      }
+
+      if (method === 'OPTIONS') {
+        if (!acceptedOrigin) {
+          const error = new Error('cors-origin-required');
+          error.status = 403;
+          throw error;
+        }
+        response.writeHead(204, {
+          ...securityHeaders(requestId),
+          'access-control-allow-origin': acceptedOrigin,
+          'access-control-allow-methods': ALLOWED_METHODS,
+          'access-control-allow-headers': ALLOWED_HEADERS,
+          'access-control-max-age': '600',
+          vary: 'Origin'
+        });
+        response.end();
+        return;
       }
 
       if (method === 'GET' && pathname === '/health') {
-        return writeJson(response, 200, { status: 'ok', service: 'aarulya-store-api' }, requestId);
+        return writeJson(response, 200, { status: 'ok', service: 'aarulya-store-api' }, requestId, acceptedOrigin);
       }
 
-      if (method === 'GET' && pathname === '/api/v1/catalog') {
-        const result = service.listCatalog({
-          category: url.searchParams.get('category'),
-          query: url.searchParams.get('q') || '',
-          limit: url.searchParams.get('limit') || 50,
-          offset: url.searchParams.get('offset') || 0
-        });
-        return writeJson(response, 200, result, requestId);
-      }
-
-      const appParams = method === 'GET' ? routeMatch(pathname, '/api/v1/apps/:appId') : null;
-      if (appParams) return writeJson(response, 200, service.getApp(appParams.appId), requestId);
-
-      if (method === 'POST' && pathname === '/api/v1/actions/resolve') {
-        const body = await readJson(request);
-        return writeJson(response, 200, { actions: service.resolveAction(body.query) }, requestId);
-      }
-
-      const token = bearerToken(request);
-      const identity = token ? await authenticate(token, { requestId, pathname, method }) : null;
+      const identity = await authenticate(request, requirementsFor(method, pathname));
       if (!identity?.actorId) {
         const error = new Error('authentication-required');
         error.status = 401;
@@ -126,21 +160,39 @@ export function createHttpHandler({
       }
       const context = Object.freeze({
         actorId: identity.actorId,
-        authorizedOwner: identity.roles?.includes('owner') === true,
+        externalSubject: identity.externalSubject || null,
+        sessionId: identity.sessionId,
+        deviceId: identity.deviceId,
+        authorizedOwner: identity.authorizedOwner === true,
         requestId
       });
 
+      if (method === 'GET' && pathname === '/api/v1/catalog') {
+        const result = await service.listCatalog({
+          category: url.searchParams.get('category'),
+          query: url.searchParams.get('q') || '',
+          limit: url.searchParams.get('limit') || 50,
+          offset: url.searchParams.get('offset') || 0
+        });
+        return writeJson(response, 200, result, requestId, acceptedOrigin);
+      }
+
+      const appParams = method === 'GET' ? routeMatch(pathname, '/api/v1/apps/:appId') : null;
+      if (appParams) {
+        return writeJson(response, 200, await service.getApp(appParams.appId), requestId, acceptedOrigin);
+      }
+
+      if (method === 'POST' && pathname === '/api/v1/actions/resolve') {
+        const body = await readJson(request);
+        return writeJson(response, 200, { actions: await service.resolveAction(body.query) }, requestId, acceptedOrigin);
+      }
+
       if (method === 'POST' && pathname === '/api/v1/downloads/authorize') {
-        if (!releaseRepository) {
-          const error = new Error('release-repository-not-configured');
-          error.status = 503;
-          throw error;
-        }
         const body = await readJson(request);
         const idempotencyKey = requireIdempotency(request);
         const release = await releaseRepository.getReleaseForDownload(body.appId, body.versionCode, context);
         const catalogManifest = await releaseRepository.getCurrentCatalogManifest(context);
-        const result = service.authorizeDownload(
+        const result = await service.authorizeDownload(
           { ...context, idempotencyKey },
           {
             release,
@@ -149,38 +201,42 @@ export function createHttpHandler({
             globalKillSwitch: await releaseRepository.isGlobalDownloadDisabled()
           }
         );
-        return writeJson(response, 201, result, requestId);
+        return writeJson(response, 201, result, requestId, acceptedOrigin);
       }
 
       if (method === 'POST' && pathname === '/api/v1/installs/report') {
-        if (!releaseRepository) {
-          const error = new Error('release-repository-not-configured');
-          error.status = 503;
-          throw error;
-        }
-        requireIdempotency(request);
         const body = await readJson(request);
+        const idempotencyKey = requireIdempotency(request);
         const candidate = await releaseRepository.getReleaseByPackageAndVersion(body.packageId, body.versionCode, context);
         const catalogManifest = await releaseRepository.getCurrentCatalogManifest(context);
-        const receipt = service.reportInstall(context, {
+        const receipt = await service.reportInstall(context, {
           installed: body.installed || null,
           candidate,
           downloadedSha256: body.downloadedSha256,
           catalogManifest,
-          deviceId: body.deviceId
+          deviceId: body.deviceId,
+          idempotencyKey
         });
-        return writeJson(response, 201, receipt, requestId);
+        return writeJson(response, 201, receipt, requestId, acceptedOrigin);
+      }
+
+      if (method === 'POST' && pathname === '/api/v1/updates/check') {
+        const body = await readJson(request);
+        const result = await service.checkUpdate(context, body);
+        return writeJson(response, 200, result, requestId, acceptedOrigin);
       }
 
       if (method === 'POST' && pathname === '/api/v1/jobs') {
         const body = await readJson(request);
         const idempotencyKey = requireIdempotency(request);
-        const job = service.createJob(context, { ...body, idempotencyKey });
-        return writeJson(response, 201, job, requestId);
+        const job = await service.createJob(context, { ...body, idempotencyKey });
+        return writeJson(response, 201, job, requestId, acceptedOrigin);
       }
 
       const jobParams = method === 'GET' ? routeMatch(pathname, '/api/v1/jobs/:jobId') : null;
-      if (jobParams) return writeJson(response, 200, service.getJob(context, jobParams.jobId), requestId);
+      if (jobParams) {
+        return writeJson(response, 200, await service.getJob(context, jobParams.jobId), requestId, acceptedOrigin);
+      }
 
       const transitionParams = method === 'POST'
         ? routeMatch(pathname, '/api/v1/jobs/:jobId/:action')
@@ -192,19 +248,20 @@ export function createHttpHandler({
           : transitionParams.action === 'resume'
             ? 'queued'
             : 'cancelled';
-        const job = service.transitionJob(context, transitionParams.jobId, target, { source: 'user-api' });
-        return writeJson(response, 200, job, requestId);
+        const job = await service.transitionJob(context, transitionParams.jobId, target, { source: 'user-api' });
+        return writeJson(response, 200, job, requestId, acceptedOrigin);
       }
 
-      return writeJson(response, 404, { error: 'route-not-found', requestId }, requestId);
+      return writeJson(response, 404, { error: 'route-not-found', requestId }, requestId, acceptedOrigin);
     } catch (error) {
       const status = Number.isInteger(error.status) ? error.status : 500;
       const code = status >= 500 ? 'internal-server-error' : String(error.code || error.message || 'request-failed');
+      if (status >= 500) console.error({ requestId, error: error?.stack || String(error) });
       return writeJson(response, status, {
         error: code,
         requestId,
         ...(status < 500 && error.details ? { details: error.details } : {})
-      }, requestId);
+      }, requestId, acceptedOrigin);
     }
   };
 }
