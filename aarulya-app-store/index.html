@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#07101f">
-  <meta name="description" content="Aarulya App Store — zone-based original Android apps for India">
+  <meta name="description" content="Aarulya App Store — original Android apps for India">
   <title>Aarulya App Store</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -12,7 +12,7 @@
   <header class="topbar">
     <a class="brand" href="#top"><span class="logo">A</span><span><strong>Aarulya App Store</strong><small>Original • Verified • India-first</small></span></a>
     <nav class="top-actions">
-      <button id="homeButton" class="ghost">All Zones</button>
+      <a href="#categories" class="ghost-link">Categories</a>
       <button id="developerButton" class="ghost">Developer Portal</button>
     </nav>
   </header>
@@ -21,14 +21,17 @@
     <section class="hero">
       <div>
         <p class="eyebrow">AARULYA CLOUD DISTRIBUTION</p>
-        <h1>हर काम का अपना अलग Zone</h1>
-        <p>Games, books, cinema, farming, study, business, documents, creator tools और daily utilities—सब अपने अलग सुरक्षित section में।</p>
-        <div class="searchbox"><input id="searchInput" type="search" placeholder="Zone या app खोजें…" autocomplete="off"><button id="clearSearch" aria-label="Clear search">×</button></div>
+        <h1>एक ही Store में हर काम का सही app</h1>
+        <p>Games, books, cinema, farming, study, business, documents और छोटे daily tools—सब एक unified catalog में।</p>
+        <div class="searchbox">
+          <input id="searchInput" type="search" placeholder="App खोजें—PDF, photo, games, books, farming…" autocomplete="off">
+          <button id="clearSearch" aria-label="Clear search">×</button>
+        </div>
       </div>
       <aside class="status-card">
         <span>Foundation status</span>
         <strong id="catalogCount">0 apps catalogued</strong>
-        <p>Downloads तभी खुलेंगे जब signed APK, checksum, privacy policy और security review complete हों।</p>
+        <p>Download तभी खुलेगा जब signed APK, checksum, privacy policy और security review complete हों।</p>
       </aside>
     </section>
 
@@ -39,44 +42,38 @@
       <div><b>Original content</b><span>No copied apps, books or films</span></div>
     </section>
 
-    <section id="zonesSection" class="zones-section">
-      <div class="section-head"><div><p class="eyebrow">STORE ZONES</p><h2>अपना Zone चुनें</h2></div><span id="zoneCount" class="count-pill"></span></div>
-      <div id="zoneGrid" class="zone-grid"></div>
+    <section id="featured" class="featured-section">
+      <div class="section-head"><div><p class="eyebrow">FEATURED</p><h2>मुख्य Aarulya apps</h2></div></div>
+      <div id="featuredGrid" class="featured-grid"></div>
     </section>
 
-    <section id="zoneDetail" class="zone-detail" hidden>
-      <button id="backToZones" class="back-button">← सभी Zones</button>
-      <div class="zone-hero">
-        <div id="zoneIcon" class="zone-hero-icon">A</div>
-        <div><p id="zoneAudience" class="eyebrow"></p><h2 id="zoneName"></h2><p id="zoneTagline"></p></div>
-      </div>
-      <div class="zone-layout">
-        <div>
-          <div class="section-head"><div><p class="eyebrow">APPS</p><h3>इस Zone के apps</h3></div></div>
-          <div id="zoneAppGrid" class="app-grid"></div>
-          <div id="zoneEmpty" class="empty" hidden>इस Zone के apps अभी production queue में हैं।</div>
-        </div>
-        <aside class="zone-sidebar">
-          <section><h3>Planned services</h3><ul id="zonePlanned"></ul></section>
-          <section><h3>Zone rules</h3><ul id="zoneRules"></ul></section>
-        </aside>
-      </div>
+    <section id="categories" class="categories-section">
+      <div class="section-head"><div><p class="eyebrow">BROWSE</p><h2>Categories</h2></div></div>
+      <div id="categoryChips" class="chips"></div>
     </section>
+
+    <section id="searchResultsSection" class="catalog-section" hidden>
+      <div class="section-head"><div><p class="eyebrow">SEARCH RESULTS</p><h2 id="searchTitle">Matching apps</h2></div></div>
+      <div id="searchResults" class="app-grid"></div>
+      <div id="searchEmpty" class="empty" hidden>इस search में कोई app नहीं मिला।</div>
+    </section>
+
+    <div id="shelves"></div>
 
     <section id="allAppsSection" class="catalog-section">
-      <div class="section-head"><div><p class="eyebrow">FIRST-PARTY CATALOG</p><h2>सभी Aarulya apps</h2></div><div id="categoryChips" class="chips"></div></div>
+      <div class="section-head"><div><p class="eyebrow">FULL CATALOG</p><h2>सभी Aarulya apps</h2></div><span id="visibleCount" class="count-pill"></span></div>
       <div id="appGrid" class="app-grid"></div>
-      <div id="emptyState" class="empty" hidden>इस search में कोई app नहीं मिला।</div>
+      <div id="emptyState" class="empty" hidden>इस category में अभी कोई app नहीं है।</div>
     </section>
 
     <section class="roadmap">
-      <div><p class="eyebrow">BUILD ORDER</p><h2>पहले रोज़ काम आने वाले apps</h2></div>
+      <div><p class="eyebrow">BUILD ORDER</p><h2>पहले useful apps, फिर बड़े platforms</h2></div>
       <ol>
-        <li>Daily Tools Zone: Calculator, QR Tools, Unit Converter, Notes</li>
-        <li>Documents Zone: Scanner, Image to PDF, PDF Suite</li>
-        <li>Creator Zone: Photo Resizer, Photo Editor, Video Compressor</li>
-        <li>Farmer Zone: Crop diary, farm expense, mandi and livestock records</li>
-        <li>Game, Book, Student और Business Zones का expansion</li>
+        <li>Calculator, QR Tools, Unit Converter और Notes</li>
+        <li>Document Scanner, Image to PDF और PDF Suite</li>
+        <li>Photo Resizer, Photo Editor और Video Compressor</li>
+        <li>Aarulya Kisan, Aarulya Books और Aarulya Learning</li>
+        <li>Aarulya Play, Cinema, Business और Cloud ecosystem</li>
       </ol>
     </section>
   </main>
@@ -99,7 +96,7 @@
   <dialog id="developerDialog" class="dialog">
     <article class="dialog-card">
       <header><div><p class="eyebrow">DEVELOPER PORTAL</p><h2>Submission foundation</h2></div><button id="closeDeveloper" class="close" aria-label="Close">×</button></header>
-      <p>अभी first-party Aarulya apps प्राथमिकता हैं। Third-party onboarding में identity, app ownership, signed APK, privacy policy, copyright evidence, security scan और update signing verification अनिवार्य होंगे।</p>
+      <p>पहले Aarulya के first-party apps publish होंगे। बाद में approved developers signed APK, privacy policy, ownership proof और security scan के साथ submit कर सकेंगे।</p>
       <button class="primary" disabled>External submissions अभी बंद</button>
     </article>
   </dialog>
