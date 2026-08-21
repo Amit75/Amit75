@@ -9,8 +9,14 @@ function required(name, value) {
 
 export function createPostgresPool(env = process.env) {
   const connectionString = required('database-url', env.AARULYA_DATABASE_URL);
+  const environment = env.AARULYA_ENV || 'production';
   const sslMode = env.AARULYA_DATABASE_SSL_MODE || 'verify-full';
-  if (!['verify-full', 'require'].includes(sslMode)) throw new Error('secure-database-ssl-mode-required');
+  if (environment === 'production' && sslMode !== 'verify-full') {
+    throw new Error('production-database-verify-full-required');
+  }
+  if (!['verify-full', 'development-local'].includes(sslMode)) {
+    throw new Error('secure-database-ssl-mode-required');
+  }
 
   return new Pool({
     connectionString,
@@ -18,9 +24,7 @@ export function createPostgresPool(env = process.env) {
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
     allowExitOnIdle: false,
-    ssl: sslMode === 'verify-full'
-      ? { rejectUnauthorized: true }
-      : { rejectUnauthorized: false },
+    ssl: sslMode === 'verify-full' ? { rejectUnauthorized: true } : false,
     application_name: env.AARULYA_DATABASE_APP_NAME || 'aarulya-store-api',
     statement_timeout: 10_000,
     query_timeout: 12_000
