@@ -7,29 +7,31 @@ Aarulya Play is an original, India-first, mobile-first family game platform. One
 - Common battle lifecycle: ready -> active -> completed -> result
 - Shared player profile, XP, rank, virtual coins and daily mission state
 - Forty-game catalog across arcade, sports, board, puzzle, simulation, creativity and learning
-- Five flagship browser game foundations wired into the battle shell
+- Ten browser-playable foundations wired into the common battle shell
 - Child, teen and adult/parent audience-mode policy
 - Non-disruptive ad-placement rules with live ad serving disabled until a provider account is connected
 - Settled-revenue allocation and funded-campaign gates
 - Originality, asset-licensing and child-safety boundaries
 - No deposits, wagering, cash win/loss or withdrawal
 
-## Forty-game catalog
+## Playable foundations
 
-### Playable foundation
-1. Aarulya Metro Dash
-2. Aarulya Cricket Strike
-3. Aarulya Hill Rider
-4. Aarulya Chaupar Battle
-5. Aarulya Carrom Strike
+1. Aarulya Metro Dash — three-lane dodge battle
+2. Aarulya Cricket Strike — six-ball timing battle
+3. Aarulya Hill Rider — speed and balance race
+4. Aarulya Chaupar Battle — quick board race
+5. Aarulya Carrom Strike — five-shot aim battle
+6. Aarulya Block Puzzle — row and column clearing score battle
+7. Aarulya Goal Master — five-penalty football battle
+8. Aarulya Color Dash — Hindi colour reflex battle
+9. Aarulya Memory Battle — sixteen-card pair matching
+10. Aarulya Bubble Arena — connected-colour bubble scoring
 
-### Core expansion
-6. Aarulya Block Puzzle
-7. Aarulya Goal Master
-8. Aarulya Neon Stack
-9. Aarulya Color Dash
-10. Aarulya Memory Battle
-11. Aarulya Bubble Arena
+These are browser game foundations with independent rules and result flows. They are not being represented as final studio-grade releases; animation, audio, art assets, level depth and device testing remain production work.
+
+## Remaining production catalog
+
+11. Aarulya Neon Stack
 12. Aarulya Quiz Junior
 13. Aarulya Snake Ladder Adventure
 14. Aarulya Traffic Escape
@@ -39,8 +41,6 @@ Aarulya Play is an original, India-first, mobile-first family game platform. One
 18. Aarulya Treasure Tower
 19. Aarulya Pattern Recall
 20. Aarulya Mini Bike Sprint
-
-### Family simulation and creativity
 21. Aarulya Craft World
 22. Aarulya Obstacle Party
 23. Aarulya Pet Town
@@ -51,8 +51,6 @@ Aarulya Play is an original, India-first, mobile-first family game platform. One
 28. Aarulya Math Adventure
 29. Aarulya Hide & Seek Party
 30. Aarulya Monster Merge
-
-### Learning, simulation and adventure expansion
 31. Aarulya Water Sort
 32. Aarulya Word Builder
 33. Aarulya Space Explorer
@@ -95,6 +93,10 @@ Only verified, settled net revenue may be allocated:
 - 5% reserve
 
 Cash referral campaigns remain disabled unless the campaign is adult-only, has published terms, verification/fraud controls and enough settled money in the referral bucket.
+
+## Verification source
+
+`npm run verify` runs the source contract check for the forty-game catalog and the five phase-two starters. This does not replace browser, accessibility, performance or device testing.
 
 ## Product boundaries
 
