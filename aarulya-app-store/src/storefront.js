@@ -15,7 +15,7 @@ export const PLATFORM_APPS = Object.freeze([
     category: 'Entertainment',
     status: 'planned',
     age: '13+',
-    description: 'Aarूल्या originals, short films, regional creator videos and licensed entertainment with age ratings.'
+    description: 'Aarulya originals, short films, regional creator videos and licensed entertainment with age ratings.'
   },
   {
     id: 'aarulya-kisan',
