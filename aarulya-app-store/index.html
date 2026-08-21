@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07101f">
+  <meta name="description" content="Aarulya App Store — original Android apps for India">
+  <title>Aarulya App Store</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top"><span class="logo">A</span><span><strong>Aarulya App Store</strong><small>Original • Verified • India-first</small></span></a>
+    <button id="developerButton" class="ghost">Developer Portal</button>
+  </header>
+
+  <main id="top" class="shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">AARULYA CLOUD DISTRIBUTION</p>
+        <h1>छोटे tools से बड़े platforms तक—एक सुरक्षित अपना App Store</h1>
+        <p>Search, categories, verified releases, signed APK downloads, updates और Aarulya के original apps एक ही जगह।</p>
+        <div class="searchbox"><input id="searchInput" type="search" placeholder="App खोजें—PDF, photo, calculator, games…" autocomplete="off"><button id="clearSearch" aria-label="Clear search">×</button></div>
+      </div>
+      <aside class="status-card">
+        <span>Foundation status</span>
+        <strong id="catalogCount">0 apps catalogued</strong>
+        <p>Downloads तभी खुलेंगे जब signed APK, checksum, privacy policy और security review complete हों।</p>
+      </aside>
+    </section>
+
+    <section class="trust-strip" aria-label="Store trust rules">
+      <div><b>Signed APK</b><span>Verified owner</span></div>
+      <div><b>SHA-256</b><span>Integrity check</span></div>
+      <div><b>Security review</b><span>Malware gate</span></div>
+      <div><b>Original apps</b><span>No copied APKs</span></div>
+    </section>
+
+    <section class="catalog-section">
+      <div class="section-head"><div><p class="eyebrow">FIRST-PARTY CATALOG</p><h2>Aarulya apps</h2></div><div id="categoryChips" class="chips"></div></div>
+      <div id="appGrid" class="app-grid"></div>
+      <div id="emptyState" class="empty" hidden>इस search में कोई app नहीं मिला।</div>
+    </section>
+
+    <section class="roadmap">
+      <div><p class="eyebrow">BUILD ORDER</p><h2>पहले रोज़ काम आने वाले apps</h2></div>
+      <ol>
+        <li>Calculator, QR Tools, Unit Converter, Notes</li>
+        <li>Document Scanner, Image to PDF, PDF Suite</li>
+        <li>Photo Resizer, Photo Editor, Video Compressor</li>
+        <li>Expense Manager, Invoice, Attendance, CRM Lite</li>
+        <li>Kids Learning, Exam Planner, Aarulya Play</li>
+      </ol>
+    </section>
+  </main>
+
+  <dialog id="appDialog" class="dialog">
+    <article class="dialog-card">
+      <header><div><p id="detailCategory" class="eyebrow"></p><h2 id="detailName"></h2></div><button id="closeDialog" class="close" aria-label="Close">×</button></header>
+      <div id="detailIcon" class="detail-icon">A</div>
+      <p id="detailDescription"></p>
+      <dl>
+        <div><dt>Package</dt><dd id="detailPackage"></dd></div>
+        <div><dt>Status</dt><dd id="detailStatus"></dd></div>
+        <div><dt>Age</dt><dd id="detailAge"></dd></div>
+      </dl>
+      <button id="downloadButton" class="primary" disabled>Release अभी उपलब्ध नहीं</button>
+      <small>Installation केवल verified published release पर खुलेगी।</small>
+    </article>
+  </dialog>
+
+  <dialog id="developerDialog" class="dialog">
+    <article class="dialog-card">
+      <header><div><p class="eyebrow">DEVELOPER PORTAL</p><h2>Submission foundation</h2></div><button id="closeDeveloper" class="close" aria-label="Close">×</button></header>
+      <p>अभी first-party Aarulya apps प्राथमिकता हैं। Third-party onboarding में identity, app ownership, signed APK, privacy policy, copyright evidence, security scan और update signing verification अनिवार्य होंगे।</p>
+      <button class="primary" disabled>External submissions अभी बंद</button>
+    </article>
+  </dialog>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
