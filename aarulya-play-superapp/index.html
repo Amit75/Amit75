@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#060914">
+  <meta name="description" content="Aarulya Play — India-first original game super app">
+  <title>Aarulya Play — Battle Arena</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="Aarulya Play home">
+      <span class="brand-mark">A</span>
+      <span><strong>Aarulya Play</strong><small>20-game battle platform</small></span>
+    </a>
+    <div class="profile-strip">
+      <span id="rank">Bronze</span>
+      <strong><span id="coins">2,500</span> coins</strong>
+    </div>
+  </header>
+
+  <main id="top" class="shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">INDIA-FIRST • ORIGINAL • MOBILE-FIRST</p>
+        <h1>एक app, 20 अलग games, एक common battle level</h1>
+        <p class="lede">Quick matches, bots, win/loss result, XP, ranks, daily missions और non-cash virtual rewards.</p>
+        <div class="hero-actions">
+          <button id="playFeatured" class="primary">Featured battle खेलें</button>
+          <a class="ghost" href="#catalog">सभी games देखें</a>
+        </div>
+      </div>
+      <aside class="mission">
+        <span>Daily battle mission</span>
+        <strong>3 matches पूरा करें</strong>
+        <div class="progress"><i id="missionBar"></i></div>
+        <b id="missionText">0 / 3</b>
+      </aside>
+    </section>
+
+    <section class="metrics" aria-label="Player progress">
+      <article><span>XP</span><strong id="xp">0</strong></article>
+      <article><span>Wins</span><strong id="wins">0</strong></article>
+      <article><span>Losses</span><strong id="losses">0</strong></article>
+      <article><span>Matches</span><strong id="matches">0</strong></article>
+    </section>
+
+    <section id="catalog" class="catalog-section">
+      <div class="section-heading">
+        <div><p class="eyebrow">GAME CATALOG</p><h2>20 original Aarulya games</h2></div>
+        <div class="filters" role="group" aria-label="Game filters">
+          <button class="filter active" data-filter="all">All</button>
+          <button class="filter" data-filter="flagship">Flagship</button>
+          <button class="filter" data-filter="planned">Coming next</button>
+        </div>
+      </div>
+      <div id="gameGrid" class="game-grid"></div>
+    </section>
+
+    <section class="rules">
+      <div><p class="eyebrow">FAIR PRODUCT RULES</p><h2>Gameplay पहले, misleading reward promises नहीं</h2></div>
+      <ul>
+        <li>Virtual coins cash नहीं हैं और withdraw नहीं होते।</li>
+        <li>बच्चों के profiles में cash prompt, open chat या wager नहीं होगा।</li>
+        <li>Future referral rewards केवल actual funded revenue pool और verified backend के बाद।</li>
+        <li>हर visual, character, sound और map original या properly licensed होगा।</li>
+      </ul>
+    </section>
+  </main>
+
+  <dialog id="arena" class="arena">
+    <form method="dialog" class="arena-panel">
+      <header class="arena-head">
+        <div><p id="arenaEngine" class="eyebrow">BATTLE</p><h2 id="arenaTitle">Aarulya Game</h2></div>
+        <button class="close" value="cancel" aria-label="Close game">×</button>
+      </header>
+      <div class="scorebar"><span>You: <b id="playerScore">0</b></span><span id="timer">Ready</span><span>Bot: <b id="botScore">0</b></span></div>
+      <div id="gameStage" class="game-stage"></div>
+      <footer id="arenaFooter" class="arena-footer"></footer>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
