@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Aarulya Store</string>
+    <string name="privacy_summary">Aarulya Store पहले launch पर कोई sensitive permission नहीं मांगता। Permission केवल आपके चुने हुए feature के समय मांगी जाएगी।</string>
+    <string name="install_access_title">Apps install करने की अनुमति</string>
+    <string name="install_access_reason">Aarulya Store से चुना हुआ verified APK install करने के लिए Android की Install unknown apps setting में Aarulya Store को अनुमति देनी होगी। यह अनुमति कभी background में install करने के लिए उपयोग नहीं होगी।</string>
+    <string name="notification_title">Update alerts</string>
+    <string name="notification_reason">केवल आपके enable करने पर verified app updates और security alerts की notification भेजी जाएगी।</string>
+    <string name="permission_denied">Permission deny की गई। बाकी Store features काम करते रहेंगे।</string>
+</resources>
