@@ -1,3 +1,5 @@
+import { evaluateSecurityEvidence } from './security-policy.js';
+
 const PUBLISHABLE_STATUSES = new Set(['review', 'published']);
 const HTTPS = /^https:\/\//i;
 const SHA256 = /^[a-f0-9]{64}$/i;
@@ -8,7 +10,9 @@ export const STORE_RELEASE_MODE = Object.freeze({
   firstPartyOnly: true,
   publisher: 'Aarulya',
   importedApkResigningAllowed: false,
-  thirdPartySubmissionEnabled: false
+  thirdPartySubmissionEnabled: false,
+  securityEvidenceRequired: true,
+  publishOnSecurityWarning: false
 });
 
 function requireAarulyaOwnership(app, errors) {
@@ -19,9 +23,21 @@ function requireAarulyaOwnership(app, errors) {
   if (!COMMIT_SHA.test(app.sourceCommitSha || '')) errors.push('source-commit-proof-required');
   if (!SHA256.test(app.sourceArchiveSha256 || '')) errors.push('source-archive-hash-required');
   if (!SHA256.test(app.assetManifestSha256 || '')) errors.push('asset-manifest-hash-required');
+  if (!SHA256.test(app.sbomSha256 || '')) errors.push('sbom-hash-required');
   if (!app.signingKeyId || app.signingKeyId.length < 12) errors.push('aarulya-signing-key-id-required');
   if (app.signingOwner !== STORE_RELEASE_MODE.publisher) errors.push('aarulya-signing-owner-required');
   if (app.buildProvenance !== 'verified') errors.push('verified-build-provenance-required');
+  if (app.reproducibleBuildReview !== 'passed') errors.push('reproducible-build-review-required');
+}
+
+function requireOperationalReadiness(app, errors) {
+  if (app.vulnerabilityDisclosurePolicy !== 'published') errors.push('vulnerability-disclosure-policy-required');
+  if (app.securityContact !== 'verified') errors.push('verified-security-contact-required');
+  if (app.incidentResponsePlan !== 'approved') errors.push('approved-incident-response-plan-required');
+  if (app.rollbackPlan !== 'tested') errors.push('tested-rollback-plan-required');
+  if (app.backupRestorePlanRequired && app.backupRestoreTest !== 'passed') errors.push('backup-restore-test-required');
+  if (app.telemetryReview !== 'passed') errors.push('telemetry-review-required');
+  if (app.releaseNotesSecurityImpactReview !== 'passed') errors.push('security-impact-review-required');
 }
 
 export function validateRelease(app) {
@@ -39,20 +55,32 @@ export function validateRelease(app) {
   if (app.copyrightReview !== 'passed') errors.push('copyright-review-not-passed');
   if (app.permissionsReview !== 'passed') errors.push('permissions-review-not-passed');
   if (app.dataSafetyReview !== 'passed') errors.push('data-safety-review-not-passed');
+  if (app.dynamicSecurityTest !== 'passed') errors.push('dynamic-security-test-not-passed');
+  if (app.penetrationTestRequired && app.penetrationTest !== 'passed') errors.push('penetration-test-not-passed');
   if (app.childDirected && app.childSafetyReview !== 'passed') errors.push('child-safety-review-not-passed');
   if (!PUBLISHABLE_STATUSES.has(app.status)) errors.push('release-not-in-review-or-published');
 
   if (STORE_RELEASE_MODE.firstPartyOnly) requireAarulyaOwnership(app, errors);
+  requireOperationalReadiness(app, errors);
 
-  return { valid: errors.length === 0, errors };
+  const security = evaluateSecurityEvidence(app);
+  if (!security.valid) errors.push(...security.errors);
+
+  return Object.freeze({
+    valid: errors.length === 0,
+    errors: Object.freeze([...new Set(errors)]),
+    securityProfiles: security.profiles,
+    missingSecurityEvidence: security.missingEvidence
+  });
 }
 
 export function canDownload(app) {
   const validation = validateRelease(app);
-  return {
+  return Object.freeze({
     allowed: app?.status === 'published' && validation.valid,
-    reasons: validation.errors
-  };
+    reasons: validation.errors,
+    securityProfiles: validation.securityProfiles
+  });
 }
 
 export function verifyUpdateCompatibility(installed, candidate) {
@@ -62,7 +90,8 @@ export function verifyUpdateCompatibility(installed, candidate) {
   if (installed.signingKeyId !== candidate.signingKeyId) return { allowed: false, reason: 'signing-key-id-mismatch' };
   if (installed.publisher !== candidate.publisher) return { allowed: false, reason: 'publisher-mismatch' };
   if (candidate.versionCode <= installed.versionCode) return { allowed: false, reason: 'version-not-newer' };
+  if (candidate.revoked === true) return { allowed: false, reason: 'candidate-release-revoked' };
   const validation = validateRelease(candidate);
   if (!validation.valid) return { allowed: false, reason: 'candidate-release-invalid', details: validation.errors };
-  return { allowed: true, reason: 'verified-aarulya-update' };
+  return { allowed: true, reason: 'verified-aarulya-update', securityProfiles: validation.securityProfiles };
 }
