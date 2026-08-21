@@ -8,12 +8,14 @@ const CANONICAL_STOREFRONT_ORIGIN = 'https://store.aarulya.com';
 const port = Number(process.env.PORT || 8080);
 const host = process.env.HOST || '127.0.0.1';
 const publicOrigin = String(process.env.AARULYA_PUBLIC_ORIGIN || '').replace(/\/$/, '');
+const privateContainerNetwork = process.env.AARULYA_PRIVATE_CONTAINER_NETWORK === 'true';
 
 if (process.env.NODE_ENV !== 'production') {
   throw new Error('Aarulya Store API entrypoint is production-only; use tests for local validation');
 }
 if (publicOrigin !== CANONICAL_API_ORIGIN) throw new Error('canonical-api-origin-mismatch');
-if (host !== '127.0.0.1' && host !== '::1') throw new Error('api-must-bind-to-loopback-behind-private-edge');
+const allowedBind = host === '127.0.0.1' || host === '::1' || (privateContainerNetwork && host === '0.0.0.0');
+if (!allowedBind) throw new Error('api-bind-must-be-loopback-or-declared-private-container-network');
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('valid-api-port-required');
 
 const composition = createProductionComposition({ catalog: APP_CATALOG });
