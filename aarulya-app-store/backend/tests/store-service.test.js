@@ -17,6 +17,13 @@ function release() {
     manifestSignatureVerification: 'passed',
     malwareScan: 'passed',
     securityReview: 'passed',
+    ownershipEvidenceReview: 'passed',
+    mobileHardeningReview: 'passed',
+    androidPermissionPrivacyReview: 'passed',
+    publicationGateStatus: 'passed',
+    finalEvidenceReportSha256: 'e'.repeat(64),
+    finalEvidenceReportSignatureVerification: 'passed',
+    finalEvidenceReportTransparencyInclusion: 'verified',
     revoked: false
   };
 }
@@ -82,6 +89,19 @@ test('download grant is short-lived, actor-bound and single-use', () => {
   assert.throws(
     () => store.consumeDownloadGrant(context, authorized.token),
     (error) => error.code === 'download-grant-already-consumed'
+  );
+});
+
+test('download authorization fails without final evidence', () => {
+  const store = service();
+  const unsafe = release();
+  unsafe.androidPermissionPrivacyReview = 'failed';
+  assert.throws(
+    () => store.authorizeDownload(context, {
+      release: unsafe,
+      catalogManifest: catalogManifest()
+    }),
+    (error) => error.code === 'release-integrity-failed'
   );
 });
 
