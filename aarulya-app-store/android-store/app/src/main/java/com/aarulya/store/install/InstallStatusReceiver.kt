@@ -5,12 +5,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.os.Build
+import com.aarulya.store.storage.StoreStateDatabase
 
 class InstallStatusReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val status = intent.getIntExtra(
-            PackageInstaller.EXTRA_STATUS,
-            PackageInstaller.STATUS_FAILURE
+        val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+        val sessionId = intent.getIntExtra(
+            VerifiedPackageInstaller.EXTRA_AARULYA_SESSION_ID,
+            intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1)
         )
 
         if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
@@ -25,23 +27,13 @@ class InstallStatusReceiver : BroadcastReceiver() {
             return
         }
 
-        // Production implementation must send only a redacted receipt to the
-        // Aarulya backend. Never log token, file path, user data or raw intent.
-        val packageName = intent.getStringExtra(PackageInstaller.EXTRA_PACKAGE_NAME)
-        val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
-        InstallStatusReceiptSink.record(
-            context = context,
-            packageName = packageName,
-            status = status,
-            redactedMessage = message?.take(160)
-        )
-    }
-}
-
-object InstallStatusReceiptSink {
-    @Suppress("UNUSED_PARAMETER")
-    fun record(context: Context, packageName: String?, status: Int, redactedMessage: String?) {
-        // Fail closed until authenticated backend receipt upload is injected.
-        // Local plaintext persistence is intentionally not implemented.
+        if (sessionId >= 0) {
+            val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
+                ?.replace(Regex("[\\r\\n\\t]+"), " ")
+                ?.take(160)
+            StoreStateDatabase(context).updateStatus(sessionId, status, message)
+        }
+        // No access token, APK path, user identifier or raw system intent is logged or persisted here.
+        // Successful receipts are uploaded later from an authenticated foreground session.
     }
 }
