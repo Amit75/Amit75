@@ -5,6 +5,8 @@ SET search_path TO aarulya_store, public;
 ALTER TABLE apps
   ADD COLUMN description text NOT NULL DEFAULT '',
   ADD COLUMN age_label text NOT NULL DEFAULT 'Not rated',
+  ADD COLUMN lifecycle_status text NOT NULL DEFAULT 'planned'
+    CHECK (lifecycle_status IN ('planned', 'in-development', 'source-foundation', 'private-test', 'retired')),
   ADD COLUMN visibility text NOT NULL DEFAULT 'visible'
     CHECK (visibility IN ('visible', 'hidden', 'retired')),
   ADD COLUMN featured boolean NOT NULL DEFAULT false,
