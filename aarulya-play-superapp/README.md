@@ -6,12 +6,13 @@ Aarulya Play is an original, India-first, mobile-first game platform. One applic
 
 - Common battle lifecycle: ready -> active -> completed -> result
 - Shared player profile, XP, rank, virtual coins and daily mission state
-- Twenty-game catalog
+- Thirty-game catalog
 - Five flagship game modules wired into the common battle shell
+- Ten child-friendly expansion concepts covering sandbox, party, simulation, creativity and learning
 - Original names, visuals, rules and source implementation
 - No deposits, wagering, cash win/loss or withdrawal in this milestone
 
-## Twenty-game catalog
+## Thirty-game catalog
 
 ### Flagship foundation
 1. Aarulya Metro Dash
@@ -20,7 +21,7 @@ Aarulya Play is an original, India-first, mobile-first game platform. One applic
 4. Aarulya Chaupar Battle
 5. Aarulya Carrom Strike
 
-### Expansion catalog
+### Core expansion catalog
 6. Aarulya Block Puzzle
 7. Aarulya Goal Master
 8. Aarulya Neon Stack
@@ -37,11 +38,32 @@ Aarulya Play is an original, India-first, mobile-first game platform. One applic
 19. Aarulya Pattern Recall
 20. Aarulya Mini Bike Sprint
 
+### Child-friendly trend expansion
+21. Aarulya Craft World
+22. Aarulya Obstacle Party
+23. Aarulya Pet Town
+24. Aarulya Farm Builder
+25. Aarulya Cooking Rush
+26. Aarulya Fashion Studio
+27. Aarulya Drawing Quest
+28. Aarulya Math Adventure
+29. Aarulya Hide & Seek Party
+30. Aarulya Monster Merge
+
+## Expansion priorities
+
+- Casual simulation and building for repeat play
+- Runner and obstacle-party sessions for quick engagement
+- Board, puzzle and merge games for family reach
+- Cricket and sports for India-first relevance
+- Creativity, pets, cooking, fashion and learning for younger audiences
+- Bot/local play first; no open stranger chat for child profiles
+
 ## Product boundaries
 
 - Virtual coins are not money and cannot be withdrawn.
 - Referral cash rewards remain disabled until a verified backend ledger, campaign terms, fraud controls, KYC/age rules and an actually funded revenue pool exist.
-- Child profiles must not receive open chat, cash prompts or gambling-like mechanics.
+- Child profiles must not receive open chat, stranger messaging, cash prompts or gambling-like mechanics.
 - Ads, subscriptions, cosmetics, sponsored challenges and licensing are the intended revenue sources.
 
 ## Copyright and originality rules
@@ -50,6 +72,7 @@ Aarulya Play is an original, India-first, mobile-first game platform. One applic
 - Keep an asset register for every external asset with its licence and source.
 - Commission or generate original artwork and audio for final production.
 - Similar genres are allowed; copied expression and branded identity are not.
+- Sandbox, runner, board and party mechanics must use Aarulya-original worlds, characters, level layouts, UI and progression.
 
 ## Branch
 
