@@ -39,6 +39,7 @@ class InstallStatusReceiver : BroadcastReceiver() {
 }
 
 object InstallStatusReceiptSink {
+    @Suppress("UNUSED_PARAMETER")
     fun record(context: Context, packageName: String?, status: Int, redactedMessage: String?) {
         // Fail closed until authenticated backend receipt upload is injected.
         // Local plaintext persistence is intentionally not implemented.
