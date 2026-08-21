@@ -11,14 +11,11 @@ x-backend-common: &backend-common
   tmpfs:
     - /tmp:rw,noexec,nosuid,nodev,size=64m
   networks: [private]
-  secrets:
-    - database_url
   environment: &backend-environment
     NODE_ENV: production
     AARULYA_ENV: production
     HOST: 0.0.0.0
     AARULYA_PRIVATE_CONTAINER_NETWORK: "true"
-    AARULYA_DATABASE_URL_FILE: /run/secrets/database_url
     AARULYA_DATABASE_SSL_MODE: verify-full
     AARULYA_OIDC_ISSUER: https://identity.aarulya.com
     AARULYA_OIDC_AUDIENCE: aarulya-store-api
@@ -31,8 +28,10 @@ services:
     <<: *backend-common
     restart: "no"
     command: ["src/migrate.js"]
+    secrets: [migrator_database_url]
     environment:
       <<: *backend-environment
+      AARULYA_DATABASE_URL_FILE: /run/secrets/migrator_database_url
       AARULYA_DATABASE_APP_NAME: aarulya-store-migrations
       AARULYA_DATABASE_POOL_MAX: "1"
 
@@ -40,11 +39,13 @@ services:
     <<: *backend-common
     restart: "no"
     command: ["src/seed-catalog.js"]
+    secrets: [migrator_database_url]
     depends_on:
       migrate:
         condition: service_completed_successfully
     environment:
       <<: *backend-environment
+      AARULYA_DATABASE_URL_FILE: /run/secrets/migrator_database_url
       AARULYA_DATABASE_APP_NAME: aarulya-store-catalog-seed
       AARULYA_DATABASE_POOL_MAX: "1"
       AARULYA_SOURCE_COMMIT_SHA: ${AARULYA_SOURCE_COMMIT_SHA:?exact source commit SHA required}
@@ -52,6 +53,7 @@ services:
   api:
     <<: *backend-common
     command: ["src/server.js"]
+    secrets: [api_database_url]
     depends_on:
       seed-catalog:
         condition: service_completed_successfully
@@ -59,6 +61,7 @@ services:
       <<: *backend-environment
       PORT: "8080"
       AARULYA_PUBLIC_ORIGIN: https://api.store.aarulya.com
+      AARULYA_DATABASE_URL_FILE: /run/secrets/api_database_url
       AARULYA_DATABASE_APP_NAME: aarulya-store-api
       AARULYA_DATABASE_POOL_MAX: "10"
     healthcheck:
@@ -71,6 +74,7 @@ services:
   downloads:
     <<: *backend-common
     command: ["src/artifact-server.js"]
+    secrets: [downloads_database_url]
     depends_on:
       seed-catalog:
         condition: service_completed_successfully
@@ -80,6 +84,7 @@ services:
       AARULYA_ARTIFACT_MODE: downloads
       AARULYA_PUBLIC_ORIGIN: https://downloads.store.aarulya.com
       AARULYA_ARTIFACT_ROOT: /srv/artifacts
+      AARULYA_DATABASE_URL_FILE: /run/secrets/downloads_database_url
       AARULYA_DATABASE_APP_NAME: aarulya-store-downloads
       AARULYA_DATABASE_POOL_MAX: "5"
     volumes:
@@ -144,8 +149,12 @@ networks:
     internal: true
 
 secrets:
-  database_url:
-    file: ${AARULYA_DATABASE_URL_SECRET_FILE:?database URL secret file required}
+  migrator_database_url:
+    file: ${AARULYA_MIGRATOR_DATABASE_URL_SECRET_FILE:?migrator database URL secret file required}
+  api_database_url:
+    file: ${AARULYA_API_DATABASE_URL_SECRET_FILE:?API database URL secret file required}
+  downloads_database_url:
+    file: ${AARULYA_DOWNLOADS_DATABASE_URL_SECRET_FILE:?downloads database URL secret file required}
 
 volumes:
   caddy_data: {}
