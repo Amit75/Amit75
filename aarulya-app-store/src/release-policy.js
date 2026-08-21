@@ -1,6 +1,9 @@
 import { evaluateSecurityEvidence } from './security-policy.js';
 import { evaluateSovereignAssurance } from './sovereign-assurance.js';
 import { evaluateAttestationSet } from './attestation-policy.js';
+import { evaluateRuntimeSecurity } from './runtime-security.js';
+import { evaluatePrivacy } from './privacy-policy.js';
+import { evaluateAbuseResilience } from './abuse-resilience.js';
 
 const PUBLISHABLE_STATUSES = new Set(['review', 'published']);
 const HTTPS = /^https:\/\//i;
@@ -16,9 +19,15 @@ export const STORE_RELEASE_MODE = Object.freeze({
   securityEvidenceRequired: true,
   sovereignAssuranceRequired: true,
   signedAttestationsRequired: true,
+  runtimeSecurityRequired: true,
+  privacyByDesignRequired: true,
+  abuseResilienceRequired: true,
   publishOnSecurityWarning: false,
   publishOnAssuranceWarning: false,
-  publishOnAttestationWarning: false
+  publishOnAttestationWarning: false,
+  publishOnRuntimeWarning: false,
+  publishOnPrivacyWarning: false,
+  publishOnAbuseWarning: false
 });
 
 function requireAarulyaOwnership(app, errors) {
@@ -44,6 +53,9 @@ function requireOperationalReadiness(app, errors) {
   if (app.backupRestorePlanRequired && app.backupRestoreTest !== 'passed') errors.push('backup-restore-test-required');
   if (app.telemetryReview !== 'passed') errors.push('telemetry-review-required');
   if (app.releaseNotesSecurityImpactReview !== 'passed') errors.push('security-impact-review-required');
+  if (app.runtimeMonitoringPlan !== 'approved') errors.push('runtime-monitoring-plan-required');
+  if (app.privacyIncidentRunbook !== 'tested') errors.push('privacy-incident-runbook-required');
+  if (app.abuseResponseRunbook !== 'tested') errors.push('abuse-response-runbook-required');
 }
 
 export function validateRelease(app) {
@@ -75,11 +87,17 @@ export function validateRelease(app) {
   const assurance = evaluateSovereignAssurance(app);
   if (!assurance.valid) errors.push(...assurance.errors);
 
-  const attestations = evaluateAttestationSet({
-    ...app,
-    sovereignAssuranceTier: assurance.tier
-  });
+  const attestations = evaluateAttestationSet({ ...app, sovereignAssuranceTier: assurance.tier });
   if (!attestations.valid) errors.push(...attestations.errors);
+
+  const runtime = evaluateRuntimeSecurity(app);
+  if (!runtime.valid) errors.push(...runtime.errors);
+
+  const privacy = evaluatePrivacy(app);
+  if (!privacy.valid) errors.push(...privacy.errors);
+
+  const abuse = evaluateAbuseResilience(app);
+  if (!abuse.valid) errors.push(...abuse.errors);
 
   return Object.freeze({
     valid: errors.length === 0,
@@ -89,7 +107,11 @@ export function validateRelease(app) {
     sovereignAssuranceTier: assurance.tier,
     sovereignAssuranceTarget: assurance.target,
     signedAttestationCount: attestations.attestationCount,
-    signedAttestationTypes: attestations.types
+    signedAttestationTypes: attestations.types,
+    runtimeSecurityTier: runtime.tier,
+    privacyDataTypes: privacy.dataTypes,
+    privacyProcessorCount: privacy.processorCount,
+    abuseResilienceTier: abuse.tier
   });
 }
 
@@ -100,7 +122,9 @@ export function canDownload(app) {
     reasons: validation.errors,
     securityProfiles: validation.securityProfiles,
     sovereignAssuranceTier: validation.sovereignAssuranceTier,
-    signedAttestationCount: validation.signedAttestationCount
+    signedAttestationCount: validation.signedAttestationCount,
+    runtimeSecurityTier: validation.runtimeSecurityTier,
+    abuseResilienceTier: validation.abuseResilienceTier
   });
 }
 
@@ -114,11 +138,13 @@ export function verifyUpdateCompatibility(installed, candidate) {
   if (candidate.revoked === true) return { allowed: false, reason: 'candidate-release-revoked' };
   const validation = validateRelease(candidate);
   if (!validation.valid) return { allowed: false, reason: 'candidate-release-invalid', details: validation.errors };
-  return {
+  return Object.freeze({
     allowed: true,
     reason: 'verified-aarulya-sovereign-update',
     securityProfiles: validation.securityProfiles,
     sovereignAssuranceTier: validation.sovereignAssuranceTier,
-    signedAttestationCount: validation.signedAttestationCount
-  };
+    signedAttestationCount: validation.signedAttestationCount,
+    runtimeSecurityTier: validation.runtimeSecurityTier,
+    abuseResilienceTier: validation.abuseResilienceTier
+  });
 }
