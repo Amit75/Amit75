@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import pg from 'pg';
 
 const { Pool } = pg;
@@ -7,8 +8,23 @@ function required(name, value) {
   return value;
 }
 
+function secretValue(env, directName, fileName) {
+  const direct = String(env[directName] || '').trim();
+  const file = String(env[fileName] || '').trim();
+  if (direct && file) throw new Error(`${directName}-and-${fileName}-mutually-exclusive`);
+  if (file) {
+    const value = readFileSync(file, { encoding: 'utf8', flag: 'r' }).trim();
+    if (!value) throw new Error(`${fileName}-empty`);
+    return value;
+  }
+  return direct;
+}
+
 export function createPostgresPool(env = process.env) {
-  const connectionString = required('database-url', env.AARULYA_DATABASE_URL);
+  const connectionString = required(
+    'database-url-or-file',
+    secretValue(env, 'AARULYA_DATABASE_URL', 'AARULYA_DATABASE_URL_FILE')
+  );
   const environment = env.AARULYA_ENV || 'production';
   const sslMode = env.AARULYA_DATABASE_SSL_MODE || 'verify-full';
   if (environment === 'production' && sslMode !== 'verify-full') {
