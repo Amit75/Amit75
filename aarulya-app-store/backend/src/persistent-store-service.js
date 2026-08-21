@@ -19,12 +19,12 @@ function requireContext(context = {}) {
 
 export function createPersistentStoreService({ catalog, storeRepository, jobRepository, now = () => Date.now() } = {}) {
   if (!storeRepository || !jobRepository) throw new Error('persistent-repositories-required');
-  const publicService = createStoreService({ catalog, now });
+  const actionService = createStoreService({ catalog, now });
 
   return Object.freeze({
-    listCatalog: (input) => publicService.listCatalog(input),
-    getApp: (appId) => publicService.getApp(appId),
-    resolveAction: (query) => publicService.resolveAction(query),
+    listCatalog: (input) => storeRepository.listCatalog(input),
+    getApp: (appId) => storeRepository.getApp(appId),
+    resolveAction: (query) => actionService.resolveAction(query),
 
     async authorizeDownload(context, { release, catalogManifest, packageKillSwitch, globalKillSwitch } = {}) {
       requireContext(context);
@@ -33,7 +33,7 @@ export function createPersistentStoreService({ catalog, storeRepository, jobRepo
       if (!context.idempotencyKey) throw fail('valid-idempotency-key-required');
       return storeRepository.createDownloadGrant({
         userId: context.actorId,
-        deviceId: context.deviceId || null,
+        devicePublicId: context.deviceId || null,
         release,
         requestId: context.requestId,
         idempotencyKey: context.idempotencyKey
