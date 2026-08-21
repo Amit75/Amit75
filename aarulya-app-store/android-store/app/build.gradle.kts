@@ -15,8 +15,9 @@ android {
         versionName = "0.1.0"
 
         buildConfigField("String", "STORE_ORIGIN", "\"https://store.aarulya.com\"")
-        buildConfigField("String", "API_BASE_URL", "\"https://store.aarulya.com/api/v1\"")
-        buildConfigField("String", "EVIDENCE_BASE_URL", "\"https://store.aarulya.com/evidence\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://api.store.aarulya.com/v1\"")
+        buildConfigField("String", "DOWNLOAD_BASE_URL", "\"https://downloads.store.aarulya.com\"")
+        buildConfigField("String", "EVIDENCE_BASE_URL", "\"https://evidence.store.aarulya.com\"")
     }
 
     buildTypes {
