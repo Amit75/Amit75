@@ -3,6 +3,7 @@ import { withActorTransaction, withTransaction } from './postgres.js';
 
 const DOWNLOAD_TTL_SECONDS = 300;
 const DOWNLOAD_ORIGIN = 'https://downloads.store.aarulya.com';
+const MAX_PAGE_SIZE = 100;
 
 function sha256(value) {
   return createHash('sha256').update(String(value)).digest('hex');
@@ -19,7 +20,7 @@ function requireUuid(name, value) {
 function rowToRelease(row) {
   if (!row) return null;
   return Object.freeze({
-    releaseId: row.release_id,
+    releaseId: String(row.release_id),
     appId: row.app_id,
     packageId: row.package_id,
     publisher: row.publisher,
@@ -46,6 +47,24 @@ function rowToRelease(row) {
     minimumStoreVersionCode: 1,
     currentStoreVersionCode: 1,
     revoked: row.status === 'revoked' || row.revoked_at != null
+  });
+}
+
+function rowToPublicApp(row) {
+  return Object.freeze({
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    description: row.description,
+    age: row.age_label,
+    packageId: row.package_id,
+    publisher: row.publisher,
+    status: row.published_version_code ? 'published' : row.lifecycle_status,
+    featured: row.featured === true,
+    latestVersionCode: row.published_version_code ? Number(row.published_version_code) : null,
+    latestVersionName: row.published_version_name || null,
+    apkSizeBytes: row.apk_size_bytes ? Number(row.apk_size_bytes) : null,
+    evidenceStatus: row.published_version_code ? 'release-envelope-required-at-download' : 'not-published'
   });
 }
 
@@ -80,6 +99,23 @@ const RELEASE_SELECT = `
   JOIN aarulya_store.apps a ON a.id = v.app_id
 `;
 
+const VALID_PUBLISHED_RELEASE = `
+  v.status = 'published'
+  AND v.revoked_at IS NULL
+  AND EXISTS (
+    SELECT 1
+    FROM aarulya_store.signed_release_envelopes envelope
+    JOIN aarulya_store.trusted_signing_keys key ON key.key_id = envelope.signing_key_id
+    WHERE envelope.app_version_id = v.id
+      AND envelope.payload_sha256 = v.release_manifest_sha256
+      AND envelope.signature_verification = 'passed'
+      AND envelope.transparency_inclusion = 'verified'
+      AND envelope.expires_at > now()
+      AND key.state IN ('active', 'retiring')
+      AND now() BETWEEN key.not_before AND key.not_after
+  )
+`;
+
 export class PostgreSqlStoreRepository {
   constructor(pool, { downloadOrigin = DOWNLOAD_ORIGIN } = {}) {
     if (!pool) throw new Error('postgres-pool-required');
@@ -103,6 +139,55 @@ export class PostgreSqlStoreRepository {
       if (!user || user.status !== 'active') throw new Error('store-account-not-active');
       return String(user.id);
     });
+  }
+
+  async listCatalog({ category = null, query = '', limit = 50, offset = 0 } = {}) {
+    const pageSize = Math.max(1, Math.min(Number(limit) || 50, MAX_PAGE_SIZE));
+    const start = Math.max(0, Number(offset) || 0);
+    const normalizedQuery = String(query || '').trim();
+    const normalizedCategory = category ? String(category).trim() : null;
+    const result = await this.pool.query(
+      `SELECT
+         a.id, a.name, a.category, a.description, a.age_label, a.package_id,
+         a.publisher, a.lifecycle_status, a.featured,
+         release.version_code AS published_version_code,
+         release.version_name AS published_version_name,
+         release.apk_size_bytes,
+         count(*) OVER() AS total_count
+       FROM aarulya_store.apps a
+       LEFT JOIN LATERAL (
+         SELECT v.version_code, COALESCE(v.version_name_display, v.version_name) AS version_name,
+                v.apk_size_bytes
+         FROM aarulya_store.app_versions v
+         WHERE v.app_id = a.id AND ${VALID_PUBLISHED_RELEASE}
+         ORDER BY v.version_code DESC
+         LIMIT 1
+       ) release ON true
+       WHERE a.visibility = 'visible'
+         AND ($1::text IS NULL OR a.category = $1)
+         AND ($2::text = '' OR to_tsvector('simple', a.name || ' ' || a.category || ' ' || a.description)
+              @@ plainto_tsquery('simple', $2))
+       ORDER BY a.featured DESC, a.sort_priority, a.name
+       LIMIT $3 OFFSET $4`,
+      [normalizedCategory || null, normalizedQuery, pageSize, start]
+    );
+    return Object.freeze({
+      total: result.rows.length ? Number(result.rows[0].total_count) : 0,
+      offset: start,
+      limit: pageSize,
+      apps: Object.freeze(result.rows.map(rowToPublicApp))
+    });
+  }
+
+  async getApp(appId) {
+    const result = await this.listCatalog({ limit: MAX_PAGE_SIZE });
+    const app = result.apps.find((candidate) => candidate.id === String(appId));
+    if (!app) {
+      const error = new Error('app-not-found');
+      error.status = 404;
+      throw error;
+    }
+    return app;
   }
 
   async isTokenRevoked(tokenId) {
@@ -132,8 +217,7 @@ export class PostgreSqlStoreRepository {
     }
     const result = await this.pool.query(
       `${RELEASE_SELECT}
-       WHERE v.app_id = $1
-         AND v.status = 'published'
+       WHERE v.app_id = $1 AND ${VALID_PUBLISHED_RELEASE}
          ${versionFilter}
        ORDER BY v.version_code DESC
        LIMIT 1`,
@@ -151,7 +235,7 @@ export class PostgreSqlStoreRepository {
   async getReleaseByPackageAndVersion(packageId, versionCode) {
     const result = await this.pool.query(
       `${RELEASE_SELECT}
-       WHERE a.package_id = $1 AND v.version_code = $2
+       WHERE a.package_id = $1 AND v.version_code = $2 AND ${VALID_PUBLISHED_RELEASE}
        LIMIT 1`,
       [String(packageId), Number(versionCode)]
     );
@@ -166,11 +250,19 @@ export class PostgreSqlStoreRepository {
 
   async getCurrentCatalogManifest() {
     const result = await this.pool.query(
-      `SELECT catalog_version, payload_sha256, signature, signing_key_id,
-              publisher, generated_at, expires_at, signature_verification,
-              transparency_record
-       FROM aarulya_store.catalog_manifests
-       WHERE is_current = true AND expires_at > now()
+      `SELECT manifest.catalog_version, manifest.payload_sha256, manifest.signature,
+              manifest.signing_key_id, manifest.publisher, manifest.generated_at,
+              manifest.expires_at, manifest.signature_verification,
+              manifest.transparency_record
+       FROM aarulya_store.catalog_manifest_head head
+       JOIN aarulya_store.catalog_manifests manifest
+         ON manifest.id = head.catalog_manifest_id
+       JOIN aarulya_store.trusted_signing_keys key
+         ON key.key_id = manifest.signing_key_id
+       WHERE head.singleton = true
+         AND manifest.expires_at > now()
+         AND key.state IN ('active', 'retiring')
+         AND now() BETWEEN key.not_before AND key.not_after
        LIMIT 1`
     );
     const row = result.rows[0];
@@ -210,23 +302,44 @@ export class PostgreSqlStoreRepository {
     return result.rows[0]?.disabled === true;
   }
 
-  async createDownloadGrant({ userId, deviceId = null, release, requestId, idempotencyKey }) {
+  async createDownloadGrant({ userId, devicePublicId = null, release, requestId, idempotencyKey }) {
     const actorId = requireUuid('user-id', userId);
+    const releaseId = requireUuid('release-id', release?.releaseId);
     const token = randomBytes(32).toString('base64url');
     const tokenDigest = sha256(token);
     const grantId = randomUUID();
     const expiresAt = new Date(Date.now() + DOWNLOAD_TTL_SECONDS * 1000);
 
     return withActorTransaction(this.pool, actorId, async (client) => {
+      let deviceId = null;
+      if (devicePublicId) {
+        const deviceResult = await client.query(
+          `INSERT INTO aarulya_store.devices (user_id, device_public_id, last_seen_at)
+           VALUES ($1, $2, now())
+           ON CONFLICT (user_id, device_public_id)
+           DO UPDATE SET last_seen_at = now()
+           RETURNING id`,
+          [actorId, String(devicePublicId).slice(0, 512)]
+        );
+        deviceId = deviceResult.rows[0].id;
+      }
+
       const result = await client.query(
         `INSERT INTO aarulya_store.download_grants
           (id, user_id, device_id, app_version_id, token_sha256, request_id,
            expires_at, idempotency_key, download_origin)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (user_id, idempotency_key) WHERE idempotency_key IS NOT NULL
-         DO UPDATE SET request_id = EXCLUDED.request_id
+         DO UPDATE SET
+           device_id = EXCLUDED.device_id,
+           app_version_id = EXCLUDED.app_version_id,
+           token_sha256 = EXCLUDED.token_sha256,
+           request_id = EXCLUDED.request_id,
+           expires_at = EXCLUDED.expires_at,
+           consumed_at = NULL,
+           download_origin = EXCLUDED.download_origin
          RETURNING id, expires_at`,
-        [grantId, actorId, deviceId, release.releaseId, tokenDigest, requestId,
+        [grantId, actorId, deviceId, releaseId, tokenDigest, requestId,
           expiresAt, idempotencyKey, DOWNLOAD_ORIGIN]
       );
       const row = result.rows[0];
@@ -255,7 +368,7 @@ export class PostgreSqlStoreRepository {
            AND g.expires_at > now()
            AND v.id = g.app_version_id
            AND a.id = v.app_id
-           AND v.status = 'published'
+           AND ${VALID_PUBLISHED_RELEASE}
          RETURNING g.id, g.app_version_id, v.apk_object_key, v.apk_sha256,
                    v.apk_size_bytes, a.package_id, v.version_code`,
         [id, actorId, tokenDigest]
@@ -280,6 +393,7 @@ export class PostgreSqlStoreRepository {
 
   async recordInstall({ userId, devicePublicId, release, requestId, idempotencyKey, downloadedSha256, signerFingerprint }) {
     const actorId = requireUuid('user-id', userId);
+    const releaseId = requireUuid('release-id', release?.releaseId);
     return withActorTransaction(this.pool, actorId, async (client) => {
       const deviceResult = await client.query(
         `INSERT INTO aarulya_store.devices (user_id, device_public_id, last_seen_at)
@@ -287,21 +401,36 @@ export class PostgreSqlStoreRepository {
          ON CONFLICT (user_id, device_public_id)
          DO UPDATE SET last_seen_at = now()
          RETURNING id`,
-        [actorId, String(devicePublicId)]
+        [actorId, String(devicePublicId).slice(0, 512)]
       );
       const deviceId = deviceResult.rows[0].id;
-      const receiptResult = await client.query(
+      const receiptId = randomUUID();
+      const inserted = await client.query(
         `INSERT INTO aarulya_store.install_receipts
-          (user_id, device_id, app_version_id, request_id, apk_sha256,
+          (id, user_id, device_id, app_version_id, request_id, apk_sha256,
            signer_fingerprint, signing_key_id, installed_at, idempotency_key)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, now(), $8)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), $9)
          ON CONFLICT (user_id, idempotency_key) WHERE idempotency_key IS NOT NULL
-         DO UPDATE SET reported_at = now()
-         RETURNING id, installed_at`,
-        [actorId, deviceId, release.releaseId, requestId, downloadedSha256,
+         DO NOTHING
+         RETURNING id, app_version_id, apk_sha256, signer_fingerprint, installed_at`,
+        [receiptId, actorId, deviceId, releaseId, requestId, downloadedSha256,
           signerFingerprint, release.signingKeyId, idempotencyKey]
       );
-      const row = receiptResult.rows[0];
+      let row = inserted.rows[0];
+      if (!row) {
+        const existing = await client.query(
+          `SELECT id, app_version_id, apk_sha256, signer_fingerprint, installed_at
+           FROM aarulya_store.install_receipts
+           WHERE user_id = $1 AND idempotency_key = $2`,
+          [actorId, idempotencyKey]
+        );
+        row = existing.rows[0];
+        if (!row || String(row.app_version_id) !== releaseId || row.apk_sha256 !== downloadedSha256 || row.signer_fingerprint !== signerFingerprint) {
+          const error = new Error('install-idempotency-conflict');
+          error.status = 409;
+          throw error;
+        }
+      }
       return Object.freeze({
         receiptId: String(row.id),
         actorId,
@@ -326,13 +455,25 @@ export class PostgreSqlStoreRepository {
          ON CONFLICT (user_id, device_public_id)
          DO UPDATE SET last_seen_at = now()
          RETURNING id`,
-        [actorId, String(devicePublicId)]
+        [actorId, String(devicePublicId).slice(0, 512)]
       );
       const deviceId = deviceResult.rows[0].id;
+      const appResult = await client.query(
+        `SELECT id FROM aarulya_store.apps WHERE package_id = $1 AND visibility = 'visible'`,
+        [String(packageId)]
+      );
+      if (!appResult.rows[0]) {
+        await client.query(
+          `INSERT INTO aarulya_store.update_checks
+            (user_id, device_id, package_id, installed_version_code, decision, request_id)
+           VALUES ($1, $2, $3, $4, 'not-found', $5)`,
+          [actorId, deviceId, packageId, installedVersionCode, requestId]
+        );
+        return Object.freeze({ decision: 'not-found', release: null });
+      }
       const releaseResult = await client.query(
         `${RELEASE_SELECT}
-         WHERE a.package_id = $1 AND v.status = 'published'
-           AND v.version_code > $2
+         WHERE a.package_id = $1 AND v.version_code > $2 AND ${VALID_PUBLISHED_RELEASE}
          ORDER BY v.version_code DESC LIMIT 1`,
         [String(packageId), Number(installedVersionCode)]
       );
