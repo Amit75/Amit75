@@ -1,6 +1,7 @@
 const SHA256 = /^[a-f0-9]{64}$/i;
 const FINGERPRINT = /^[a-f0-9:]{32,}$/i;
 const HTTPS = /^https:\/\//i;
+const AARULYA_PACKAGE = /^com\.aarulya(?:\.[a-z][a-z0-9_]*)+$/;
 
 export const STORE_INTEGRITY_MODE = Object.freeze({
   unsignedCatalogAllowed: false,
@@ -8,7 +9,10 @@ export const STORE_INTEGRITY_MODE = Object.freeze({
   signerChangeAllowedWithoutRecovery: false,
   downgradeAllowed: false,
   revokedReleaseInstallAllowed: false,
-  hashMismatchInstallAllowed: false
+  hashMismatchInstallAllowed: false,
+  downloadWithoutFinalEvidenceAllowed: false,
+  downloadWithoutAndroidPrivacyReviewAllowed: false,
+  nonAarulyaPackageAllowed: false
 });
 
 export function validateCatalogManifest(manifest = {}) {
@@ -31,7 +35,7 @@ export function validateCatalogManifest(manifest = {}) {
 
 export function validateReleaseManifest(release = {}) {
   const errors = [];
-  if (!release.packageId) errors.push('package-id-required');
+  if (!AARULYA_PACKAGE.test(release.packageId || '')) errors.push('aarulya-package-id-required');
   if (!Number.isInteger(release.versionCode) || release.versionCode <= 0) errors.push('version-code-required');
   if (!HTTPS.test(release.apkUrl || '')) errors.push('https-apk-url-required');
   if (!SHA256.test(release.apkSha256 || release.sha256 || '')) errors.push('apk-sha256-required');
@@ -42,6 +46,13 @@ export function validateReleaseManifest(release = {}) {
   if (release.revoked === true) errors.push('release-revoked');
   if (release.malwareScan !== 'passed') errors.push('release-malware-scan-not-passed');
   if (release.securityReview !== 'passed') errors.push('release-security-review-not-passed');
+  if (release.ownershipEvidenceReview !== 'passed') errors.push('release-ownership-evidence-not-passed');
+  if (release.mobileHardeningReview !== 'passed') errors.push('release-mobile-hardening-not-passed');
+  if (release.androidPermissionPrivacyReview !== 'passed') errors.push('release-android-permission-privacy-not-passed');
+  if (release.publicationGateStatus !== 'passed') errors.push('release-publication-gate-not-passed');
+  if (!SHA256.test(release.finalEvidenceReportSha256 || '')) errors.push('release-final-evidence-report-digest-required');
+  if (release.finalEvidenceReportSignatureVerification !== 'passed') errors.push('release-final-evidence-report-signature-not-verified');
+  if (release.finalEvidenceReportTransparencyInclusion !== 'verified') errors.push('release-final-evidence-report-transparency-required');
 
   return Object.freeze({ valid: errors.length === 0, errors: Object.freeze(errors) });
 }
@@ -78,6 +89,6 @@ export function canServeDownload({ release = {}, globalKillSwitch = false, packa
   if (release.revoked === true) return { allowed: false, reason: 'release-revoked' };
   const validation = validateReleaseManifest(release);
   return validation.valid
-    ? { allowed: true, reason: 'verified-release' }
+    ? { allowed: true, reason: 'verified-aarulya-release-with-final-evidence' }
     : { allowed: false, reason: 'release-integrity-failed', details: validation.errors };
 }
