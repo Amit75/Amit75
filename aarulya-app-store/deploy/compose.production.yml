@@ -36,11 +36,24 @@ services:
       AARULYA_DATABASE_APP_NAME: aarulya-store-migrations
       AARULYA_DATABASE_POOL_MAX: "1"
 
+  seed-catalog:
+    <<: *backend-common
+    restart: "no"
+    command: ["src/seed-catalog.js"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *backend-environment
+      AARULYA_DATABASE_APP_NAME: aarulya-store-catalog-seed
+      AARULYA_DATABASE_POOL_MAX: "1"
+      AARULYA_SOURCE_COMMIT_SHA: ${AARULYA_SOURCE_COMMIT_SHA:?exact source commit SHA required}
+
   api:
     <<: *backend-common
     command: ["src/server.js"]
     depends_on:
-      migrate:
+      seed-catalog:
         condition: service_completed_successfully
     environment:
       <<: *backend-environment
@@ -59,7 +72,7 @@ services:
     <<: *backend-common
     command: ["src/artifact-server.js"]
     depends_on:
-      migrate:
+      seed-catalog:
         condition: service_completed_successfully
     environment:
       <<: *backend-environment
