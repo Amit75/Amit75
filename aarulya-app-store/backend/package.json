@@ -11,6 +11,7 @@
     "start:api": "node src/server.js",
     "start:downloads": "AARULYA_ARTIFACT_MODE=downloads node src/artifact-server.js",
     "start:evidence": "AARULYA_ARTIFACT_MODE=evidence node src/artifact-server.js",
+    "migrate": "node src/migrate.js",
     "worker": "node src/worker.js",
     "test": "node --test tests/*.test.js"
   },
