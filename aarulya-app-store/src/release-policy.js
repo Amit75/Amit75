@@ -1,4 +1,5 @@
 import { evaluateSecurityEvidence } from './security-policy.js';
+import { evaluateSovereignAssurance } from './sovereign-assurance.js';
 
 const PUBLISHABLE_STATUSES = new Set(['review', 'published']);
 const HTTPS = /^https:\/\//i;
@@ -12,7 +13,9 @@ export const STORE_RELEASE_MODE = Object.freeze({
   importedApkResigningAllowed: false,
   thirdPartySubmissionEnabled: false,
   securityEvidenceRequired: true,
-  publishOnSecurityWarning: false
+  sovereignAssuranceRequired: true,
+  publishOnSecurityWarning: false,
+  publishOnAssuranceWarning: false
 });
 
 function requireAarulyaOwnership(app, errors) {
@@ -66,11 +69,16 @@ export function validateRelease(app) {
   const security = evaluateSecurityEvidence(app);
   if (!security.valid) errors.push(...security.errors);
 
+  const assurance = evaluateSovereignAssurance(app);
+  if (!assurance.valid) errors.push(...assurance.errors);
+
   return Object.freeze({
     valid: errors.length === 0,
     errors: Object.freeze([...new Set(errors)]),
     securityProfiles: security.profiles,
-    missingSecurityEvidence: security.missingEvidence
+    missingSecurityEvidence: security.missingEvidence,
+    sovereignAssuranceTier: assurance.tier,
+    sovereignAssuranceTarget: assurance.target
   });
 }
 
@@ -79,7 +87,8 @@ export function canDownload(app) {
   return Object.freeze({
     allowed: app?.status === 'published' && validation.valid,
     reasons: validation.errors,
-    securityProfiles: validation.securityProfiles
+    securityProfiles: validation.securityProfiles,
+    sovereignAssuranceTier: validation.sovereignAssuranceTier
   });
 }
 
@@ -93,5 +102,10 @@ export function verifyUpdateCompatibility(installed, candidate) {
   if (candidate.revoked === true) return { allowed: false, reason: 'candidate-release-revoked' };
   const validation = validateRelease(candidate);
   if (!validation.valid) return { allowed: false, reason: 'candidate-release-invalid', details: validation.errors };
-  return { allowed: true, reason: 'verified-aarulya-update', securityProfiles: validation.securityProfiles };
+  return {
+    allowed: true,
+    reason: 'verified-aarulya-sovereign-update',
+    securityProfiles: validation.securityProfiles,
+    sovereignAssuranceTier: validation.sovereignAssuranceTier
+  };
 }
