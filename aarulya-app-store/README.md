@@ -68,6 +68,39 @@ The target data layer is Aarulya-controlled PostgreSQL plus Aarulya-controlled o
 - Authorization on every protected resource
 - No stack traces, raw secrets or hidden global admin credential in public flows
 
+## Executable backend reference
+
+The branch now contains a dependency-light Node.js backend reference under `backend/`.
+
+- Public catalog, app-detail and intent-resolution endpoints
+- Protected download, installation and durable-job endpoint contracts
+- Authentication is fail-closed by default
+- Release lookup is server-side; clients cannot submit privileged release metadata as authority
+- Request body limits, strict JSON objects, origin allowlisting and safe error responses
+- Short-lived actor-bound and single-use download grants
+- Server-authoritative install receipts after catalog, hash and signer checks
+- Durable job creation, idempotency, ownership enforcement, state transitions and immutable event history
+- Graceful server shutdown and bounded HTTP timeouts
+
+Protected routes intentionally remain unavailable in the default bootstrap until a production identity verifier and release repository are injected.
+
+## PostgreSQL core migration
+
+`backend/sql/0001_core.sql` adds an executable PostgreSQL schema foundation with:
+
+- Users and devices
+- Apps, signed versions and safe-version pointers
+- Download grants and installation receipts
+- Durable jobs and append-only job events
+- Append-only security audit records
+- Package, version, digest and status constraints
+- Signer and signing-key continuity enforcement
+- Idempotency uniqueness
+- Row-level security for user-owned resources
+- Revoked public access to the Store schema by default
+
+Database deployment still requires dedicated least-privilege roles, migration verification, backup/restore testing and production connection hardening.
+
 ## First-party ownership
 
 - Every app uses Aarulya-owned source, package identity, visual identity and controlled signing keys.
@@ -126,10 +159,12 @@ Critical apps such as Aarulya Store, AaruPay, Sentinel, Aaru Browser, Cloud, Own
 - Search, category filtering, curated shelves and app-detail views
 - First-party catalog covering utilities, media, documents, education, business, rural use, safety, cloud, books, entertainment and games
 - Product foundations for intent search, quick actions and dedicated applications
-- Source contracts for APIs, service boundaries, database ownership and durable jobs
+- Executable reference backend for catalog, secure download grants, install receipts and durable jobs
+- PostgreSQL schema migration with constraints, RLS and append-only event/audit tables
+- Backend domain tests covering catalog exposure, download grant replay protection, install verification, idempotent jobs and ownership isolation
 - Security, signing, ranking, assurance, attestation and installer-integrity policy foundations
 - Download remains disabled until a release is actually signed, independently built, verified and published
 
 ## Current boundary
 
-This branch does not claim that the production API, PostgreSQL cluster, queue, workers, object storage, Android installer, HSM-backed signing, offline root ceremonies, hardened builders, cryptographic attestation verification, independent rebuild infrastructure, transparency witnesses, security scans, penetration tests, APKs or production deployment are complete. Policy and architecture files are release-blocking design foundations; operational infrastructure and evidence must still be implemented and tested.
+This branch does not claim that the production identity provider, release repository, PostgreSQL cluster, queue, workers, object storage, Android installer, HSM-backed signing, offline root ceremonies, hardened builders, cryptographic attestation verification, independent rebuild infrastructure, transparency witnesses, security scans, penetration tests, APKs or production deployment are complete. The backend and tests are source-level executable foundations; they have not been claimed as production-verified in this branch. Operational infrastructure and evidence must still be implemented and tested.
