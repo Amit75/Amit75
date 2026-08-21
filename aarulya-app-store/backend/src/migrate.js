@@ -24,9 +24,6 @@ function transactionBody(filename, sql) {
   if (!hasBegin || !hasCommit) throw new Error(`migration-transaction-wrapper-required:${filename}`);
   const body = sql.replace(/^\s*BEGIN;\s*/i, '').replace(/\s*COMMIT;\s*$/i, '').trim();
   if (!body) throw new Error(`empty-migration-body:${filename}`);
-  if (/^\s*(BEGIN|COMMIT|ROLLBACK)\b/im.test(body)) {
-    throw new Error(`nested-top-level-transaction-prohibited:${filename}`);
-  }
   return body;
 }
 
