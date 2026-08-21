@@ -7,10 +7,13 @@ const sourceCommitSha = String(process.env.AARULYA_SOURCE_COMMIT_SHA || '').trim
 if (!/^[a-f0-9]{40,64}$/.test(sourceCommitSha)) throw new Error('source-commit-sha-required');
 if (!Array.isArray(APP_CATALOG) || APP_CATALOG.length === 0) throw new Error('nonempty-aarulya-catalog-required');
 
+const allowedLifecycle = new Set(['planned', 'in-development', 'source-foundation', 'private-test']);
 const normalized = APP_CATALOG.map((app, index) => {
   if (!/^com\.aarulya(?:\.[a-z][a-z0-9_]*)+$/.test(app.packageId || '')) {
     throw new Error(`non-aarulya-package-in-catalog:${app.id}`);
   }
+  const lifecycleStatus = String(app.status || 'planned');
+  if (!allowedLifecycle.has(lifecycleStatus)) throw new Error(`invalid-catalog-lifecycle:${app.id}`);
   return Object.freeze({
     id: String(app.id),
     packageId: String(app.packageId),
@@ -18,6 +21,7 @@ const normalized = APP_CATALOG.map((app, index) => {
     category: String(app.category),
     description: String(app.description || ''),
     ageLabel: String(app.age || 'Not rated'),
+    lifecycleStatus,
     childDirected: String(app.category) === 'Kids & Family',
     featured: index < 8,
     sortPriority: index + 1
@@ -40,8 +44,8 @@ try {
       await client.query(
         `INSERT INTO apps
           (id, package_id, publisher, name, category, description, age_label,
-           child_directed, visibility, featured, sort_priority)
-         VALUES ($1, $2, 'Aarulya', $3, $4, $5, $6, $7, 'visible', $8, $9)
+           lifecycle_status, child_directed, visibility, featured, sort_priority)
+         VALUES ($1, $2, 'Aarulya', $3, $4, $5, $6, $7, $8, 'visible', $9, $10)
          ON CONFLICT (id) DO UPDATE SET
            package_id = EXCLUDED.package_id,
            publisher = 'Aarulya',
@@ -49,6 +53,7 @@ try {
            category = EXCLUDED.category,
            description = EXCLUDED.description,
            age_label = EXCLUDED.age_label,
+           lifecycle_status = CASE WHEN apps.lifecycle_status = 'retired' THEN 'retired' ELSE EXCLUDED.lifecycle_status END,
            child_directed = EXCLUDED.child_directed,
            visibility = CASE WHEN apps.visibility = 'retired' THEN 'retired' ELSE 'visible' END,
            featured = EXCLUDED.featured,
@@ -56,7 +61,7 @@ try {
            metadata_revision = apps.metadata_revision + 1,
            updated_at = now()`,
         [app.id, app.packageId, app.name, app.category, app.description,
-          app.ageLabel, app.childDirected, app.featured, app.sortPriority]
+          app.ageLabel, app.lifecycleStatus, app.childDirected, app.featured, app.sortPriority]
       );
     }
     await client.query(
