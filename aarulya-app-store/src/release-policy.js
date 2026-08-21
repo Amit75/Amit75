@@ -4,28 +4,36 @@ import { evaluateAttestationSet } from './attestation-policy.js';
 import { evaluateRuntimeSecurity } from './runtime-security.js';
 import { evaluatePrivacy } from './privacy-policy.js';
 import { evaluateAbuseResilience } from './abuse-resilience.js';
+import { evaluateOwnershipEvidence } from './ownership-evidence.js';
+import { evaluateMobileHardening } from './mobile-hardening.js';
 
 const PUBLISHABLE_STATUSES = new Set(['review', 'published']);
 const HTTPS = /^https:\/\//i;
 const SHA256 = /^[a-f0-9]{64}$/i;
 const COMMIT_SHA = /^[a-f0-9]{40,64}$/i;
-const PACKAGE_ID = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$/;
+const PACKAGE_ID = /^com\.aarulya(?:\.[a-z][a-z0-9_]*){1,}$/;
 
 export const STORE_RELEASE_MODE = Object.freeze({
   firstPartyOnly: true,
   publisher: 'Aarulya',
+  packageNamespace: 'com.aarulya',
   importedApkResigningAllowed: false,
   thirdPartySubmissionEnabled: false,
+  ownershipEvidenceRequired: true,
   securityEvidenceRequired: true,
   sovereignAssuranceRequired: true,
   signedAttestationsRequired: true,
   runtimeSecurityRequired: true,
+  mobileHardeningRequired: true,
   privacyByDesignRequired: true,
   abuseResilienceRequired: true,
+  finalEvidenceReportRequired: true,
+  publishOnOwnershipWarning: false,
   publishOnSecurityWarning: false,
   publishOnAssuranceWarning: false,
   publishOnAttestationWarning: false,
   publishOnRuntimeWarning: false,
+  publishOnHardeningWarning: false,
   publishOnPrivacyWarning: false,
   publishOnAbuseWarning: false
 });
@@ -56,13 +64,17 @@ function requireOperationalReadiness(app, errors) {
   if (app.runtimeMonitoringPlan !== 'approved') errors.push('runtime-monitoring-plan-required');
   if (app.privacyIncidentRunbook !== 'tested') errors.push('privacy-incident-runbook-required');
   if (app.abuseResponseRunbook !== 'tested') errors.push('abuse-response-runbook-required');
+  if (app.testExecutionStatus !== 'passed') errors.push('executed-test-suite-pass-required');
+  if (!SHA256.test(app.testReportSha256 || '')) errors.push('test-report-digest-required');
+  if (app.reportEvidenceFrozen !== true) errors.push('release-evidence-freeze-required');
+  if (app.releaseDecision !== 'approved') errors.push('release-approval-required');
 }
 
 export function validateRelease(app) {
   const errors = [];
 
   if (!app || typeof app !== 'object') return { valid: false, errors: ['release-required'] };
-  if (!PACKAGE_ID.test(app.packageId || '')) errors.push('invalid-package-id');
+  if (!PACKAGE_ID.test(app.packageId || '')) errors.push('aarulya-package-id-required');
   if (!/^\d+(\.\d+){1,3}$/.test(app.versionName || '')) errors.push('invalid-version-name');
   if (!Number.isInteger(app.versionCode) || app.versionCode <= 0) errors.push('invalid-version-code');
   if (!HTTPS.test(app.apkUrl || '')) errors.push('secure-apk-url-required');
@@ -81,6 +93,9 @@ export function validateRelease(app) {
   if (STORE_RELEASE_MODE.firstPartyOnly) requireAarulyaOwnership(app, errors);
   requireOperationalReadiness(app, errors);
 
+  const ownership = evaluateOwnershipEvidence(app);
+  if (!ownership.valid) errors.push(...ownership.errors);
+
   const security = evaluateSecurityEvidence(app);
   if (!security.valid) errors.push(...security.errors);
 
@@ -93,6 +108,9 @@ export function validateRelease(app) {
   const runtime = evaluateRuntimeSecurity(app);
   if (!runtime.valid) errors.push(...runtime.errors);
 
+  const hardening = evaluateMobileHardening(app);
+  if (!hardening.valid) errors.push(...hardening.errors);
+
   const privacy = evaluatePrivacy(app);
   if (!privacy.valid) errors.push(...privacy.errors);
 
@@ -102,6 +120,8 @@ export function validateRelease(app) {
   return Object.freeze({
     valid: errors.length === 0,
     errors: Object.freeze([...new Set(errors)]),
+    ownershipEvidenceCount: ownership.evidenceCount,
+    ownershipEvidenceTypes: ownership.presentTypes,
     securityProfiles: security.profiles,
     missingSecurityEvidence: security.missingEvidence,
     sovereignAssuranceTier: assurance.tier,
@@ -109,6 +129,7 @@ export function validateRelease(app) {
     signedAttestationCount: attestations.attestationCount,
     signedAttestationTypes: attestations.types,
     runtimeSecurityTier: runtime.tier,
+    mobileHardeningTier: hardening.tier,
     privacyDataTypes: privacy.dataTypes,
     privacyProcessorCount: privacy.processorCount,
     abuseResilienceTier: abuse.tier
@@ -120,10 +141,12 @@ export function canDownload(app) {
   return Object.freeze({
     allowed: app?.status === 'published' && validation.valid,
     reasons: validation.errors,
+    ownershipEvidenceCount: validation.ownershipEvidenceCount,
     securityProfiles: validation.securityProfiles,
     sovereignAssuranceTier: validation.sovereignAssuranceTier,
     signedAttestationCount: validation.signedAttestationCount,
     runtimeSecurityTier: validation.runtimeSecurityTier,
+    mobileHardeningTier: validation.mobileHardeningTier,
     abuseResilienceTier: validation.abuseResilienceTier
   });
 }
@@ -141,10 +164,12 @@ export function verifyUpdateCompatibility(installed, candidate) {
   return Object.freeze({
     allowed: true,
     reason: 'verified-aarulya-sovereign-update',
+    ownershipEvidenceCount: validation.ownershipEvidenceCount,
     securityProfiles: validation.securityProfiles,
     sovereignAssuranceTier: validation.sovereignAssuranceTier,
     signedAttestationCount: validation.signedAttestationCount,
     runtimeSecurityTier: validation.runtimeSecurityTier,
+    mobileHardeningTier: validation.mobileHardeningTier,
     abuseResilienceTier: validation.abuseResilienceTier
   });
 }
