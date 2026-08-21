@@ -1,6 +1,7 @@
 import { createBearerAuthenticator } from './auth-adapter.js';
 import { createOidcAccessTokenVerifier, oidcConfigurationFromEnvironment } from './oidc-verifier.js';
 import { createPostgresPool, closePostgresPool } from './postgres.js';
+import { PostgreSqlIdentityRepository } from './identity-repository.js';
 import { PostgreSqlStoreRepository } from './postgres-store-repository.js';
 import { PostgreSqlJobRepository } from './postgres-job-repository.js';
 import { PostgreSqlReleaseEnvelopeRepository } from './release-envelope-repository.js';
@@ -9,6 +10,7 @@ import { createPersistentStoreService } from './persistent-store-service.js';
 export function createProductionComposition({ env = process.env, catalog } = {}) {
   if (env.NODE_ENV !== 'production') throw new Error('production-composition-requires-production-environment');
   const pool = createPostgresPool(env);
+  const identityRepository = new PostgreSqlIdentityRepository(pool);
   const storeRepository = new PostgreSqlStoreRepository(pool, {
     downloadOrigin: 'https://downloads.store.aarulya.com'
   });
@@ -25,7 +27,7 @@ export function createProductionComposition({ env = process.env, catalog } = {})
 
   const authenticate = async (request, requirements) => {
     const verified = await bearer(request, requirements);
-    const internalUserId = await storeRepository.upsertUser(verified.actorId);
+    const internalUserId = await identityRepository.resolveUser(verified.actorId);
     return Object.freeze({
       ...verified,
       actorId: internalUserId,
@@ -41,6 +43,7 @@ export function createProductionComposition({ env = process.env, catalog } = {})
 
   return Object.freeze({
     pool,
+    identityRepository,
     storeRepository,
     jobRepository,
     releaseEnvelopeRepository,
