@@ -3,14 +3,15 @@ import { APP_CATALOG } from '../../src/catalog.js';
 import { createHttpHandler } from './http-app.js';
 import { createStoreService } from './store-service.js';
 
-const CANONICAL_STORE_ORIGIN = 'https://store.aarulya.com';
+const CANONICAL_API_ORIGIN = 'https://api.store.aarulya.com';
+const CANONICAL_STOREFRONT_ORIGIN = 'https://store.aarulya.com';
 const port = Number(process.env.PORT || 8080);
 const host = process.env.HOST || '127.0.0.1';
 const production = process.env.NODE_ENV === 'production';
-const publicOrigin = String(process.env.AARULYA_PUBLIC_ORIGIN || CANONICAL_STORE_ORIGIN).replace(/\/$/, '');
+const publicOrigin = String(process.env.AARULYA_PUBLIC_ORIGIN || CANONICAL_API_ORIGIN).replace(/\/$/, '');
 
-if (production && publicOrigin !== CANONICAL_STORE_ORIGIN) {
-  throw new Error('canonical-store-origin-mismatch');
+if (production && publicOrigin !== CANONICAL_API_ORIGIN) {
+  throw new Error('canonical-api-origin-mismatch');
 }
 
 const configuredOrigins = String(process.env.AARULYA_ALLOWED_ORIGINS || '')
@@ -18,7 +19,7 @@ const configuredOrigins = String(process.env.AARULYA_ALLOWED_ORIGINS || '')
   .map((value) => value.trim().replace(/\/$/, ''))
   .filter(Boolean);
 const allowedOrigins = production
-  ? [...new Set([publicOrigin, ...configuredOrigins])]
+  ? [...new Set([CANONICAL_STOREFRONT_ORIGIN, ...configuredOrigins])]
   : configuredOrigins;
 
 const service = createStoreService({ catalog: APP_CATALOG });
@@ -40,7 +41,8 @@ server.maxRequestsPerSocket = 100;
 
 server.listen(port, host, () => {
   console.log(`Aarulya Store API foundation listening on ${host}:${port}`);
-  console.log(`Canonical public origin: ${publicOrigin}`);
+  console.log(`Canonical API origin: ${publicOrigin}`);
+  console.log(`Allowed Store origin: ${CANONICAL_STOREFRONT_ORIGIN}`);
   console.log('Protected routes remain fail-closed until production auth and release repositories are configured.');
 });
 
