@@ -2,98 +2,210 @@ package com.aarulya.store
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.widget.TextView
+import android.widget.Toast
+import com.aarulya.store.auth.OidcPkceClient
+import com.aarulya.store.auth.SecureSessionStore
+import com.aarulya.store.auth.StoreSession
+import com.aarulya.store.catalog.RemoteCatalogRepository
 import com.aarulya.store.catalog.StoreApp
+import com.aarulya.store.catalog.StoreCatalog
+import com.aarulya.store.install.InstallFlowResult
+import com.aarulya.store.install.InstallReceiptUploader
+import com.aarulya.store.install.StoreInstallCoordinator
+import com.aarulya.store.ui.AccountGateView
 import com.aarulya.store.ui.StoreHomeView
+import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
+    private val executor = Executors.newSingleThreadExecutor()
+    private lateinit var sessionStore: SecureSessionStore
+    private lateinit var oidc: OidcPkceClient
+    private lateinit var catalogRepository: RemoteCatalogRepository
+    private lateinit var installCoordinator: StoreInstallCoordinator
+    private lateinit var receiptUploader: InstallReceiptUploader
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        sessionStore = SecureSessionStore(this)
+        oidc = OidcPkceClient(sessionStore)
+        catalogRepository = RemoteCatalogRepository()
+        installCoordinator = StoreInstallCoordinator(this)
+        receiptUploader = InstallReceiptUploader(this)
+        handleIntent(intent)
+    }
 
-        // Privacy invariant: never request runtime or special permissions on first launch.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    override fun onDestroy() {
+        executor.shutdownNow()
+        super.onDestroy()
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val callback = intent?.data
+        if (callback?.scheme == "aarulya-store" && callback.host == "oauth") {
+            showProgress("Verifying secure sign-in…")
+            executor.execute {
+                runCatching { oidc.exchangeCallback(callback) }
+                    .onSuccess { session ->
+                        sessionStore.saveSession(session)
+                        runOnUiThread { renderAuthenticated(session, refresh = true) }
+                    }
+                    .onFailure { error ->
+                        sessionStore.clear()
+                        runOnUiThread { renderAccountGate("Sign-in failed: ${safeError(error)}") }
+                    }
+            }
+            return
+        }
+
+        val session = sessionStore.loadSession()
+        if (session == null) renderAccountGate() else renderAuthenticated(session, refresh = true)
+    }
+
+    private fun renderAccountGate(message: String? = null) {
+        StoreCatalog.clearAuthenticatedRemoteCatalog()
+        setContentView(AccountGateView(this, message, ::beginLogin).build())
+    }
+
+    private fun beginLogin() {
+        val uri = oidc.createAuthorizationUri()
+        require(uri.scheme == "https" && uri.host == Uri.parse(BuildConfig.IDENTITY_ORIGIN).host) {
+            "trusted-identity-origin-required"
+        }
+        startActivity(Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE))
+    }
+
+    private fun renderAuthenticated(session: StoreSession, refresh: Boolean) {
+        if (!session.isUsable()) {
+            sessionStore.clear()
+            renderAccountGate("Your session expired. Sign in again.")
+            return
+        }
         setContentView(StoreHomeView(this, ::showAppDetails).build())
+        if (!refresh) return
+
+        executor.execute {
+            runCatching {
+                catalogRepository.refresh(session)
+                receiptUploader.uploadPending(session)
+            }.onSuccess {
+                runOnUiThread { setContentView(StoreHomeView(this, ::showAppDetails).build()) }
+            }.onFailure { error ->
+                if (error.message?.contains("401") == true || error.message?.contains("authentication") == true) {
+                    sessionStore.clear()
+                    runOnUiThread { renderAccountGate("Session verification failed. Sign in again.") }
+                } else {
+                    runOnUiThread {
+                        Toast.makeText(this, "Store sync unavailable: ${safeError(error)}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
     }
 
     private fun showAppDetails(app: StoreApp) {
-        val releaseMessage = when (app.statusLabel) {
-            "In development", "Source foundation" ->
-                "Download अभी बंद है। Signed APK, ownership proof, security tests और final evidence report पूरा होने के बाद ही Install चालू होगा।"
-            else ->
-                "यह Aarulya-owned app production queue में है। Ready होने से पहले copied, unsigned या unverified APK publish नहीं किया जाएगा।"
+        val releaseMessage = if (app.statusLabel.equals("published", ignoreCase = true)) {
+            "Install remains blocked unless the signed release envelope, pinned key, APK digest, signer, ownership, privacy, malware and final evidence checks all pass."
+        } else {
+            "No verified public release is available. This listing is a development record, not a production-release claim."
         }
 
-        AlertDialog.Builder(this)
+        val builder = AlertDialog.Builder(this)
             .setTitle(app.name)
             .setMessage(
-                "${app.summary}\n\n" +
-                    "Package: ${app.packageId}\n" +
-                    "Category: ${app.category}\n" +
-                    "Age: ${app.ageLabel}\n" +
-                    "Size: ${app.sizeLabel}\n" +
-                    "Evidence: ${app.trustLabel}\n" +
-                    "Status: ${app.statusLabel}\n\n" +
+                "About\n${app.summary}\n\n" +
+                    "Data safety\nNo verified public data-safety receipt is available until the exact release evidence is loaded.\n\n" +
+                    "Permissions\nNo permission is requested by this listing. Each released app must publish its exact permission purpose before download.\n\n" +
+                    "Security\nTrust: ${app.trustLabel}. Missing evidence blocks download.\n\n" +
+                    "Versions\nStatus: ${app.statusLabel}. ${app.sizeLabel}.\nPackage: ${app.packageId}\n\n" +
                     releaseMessage
             )
-            .setPositiveButton("Close", null)
-            .setNeutralButton("Trust & privacy") { _, _ -> showTrustMenu(app) }
-            .show()
+            .setNegativeButton("Close", null)
+            .setNeutralButton("Trust details") { _, _ -> showTrustDetails(app) }
+
+        if (app.statusLabel.equals("published", ignoreCase = true)) {
+            builder.setPositiveButton("Install") { _, _ -> beginVerifiedInstall(app) }
+        }
+        builder.show()
     }
 
-    private fun showTrustMenu(app: StoreApp) {
-        val sections = arrayOf("About", "Data safety", "Permissions", "Security", "Versions")
-        AlertDialog.Builder(this)
-            .setTitle("${app.name} — Trust details")
-            .setItems(sections) { _, which ->
-                when (which) {
-                    0 -> showSection(app, "About", aboutText(app))
-                    1 -> showSection(app, "Data safety", dataSafetyText(app))
-                    2 -> showSection(app, "Permissions", permissionsText(app))
-                    3 -> showSection(app, "Security", securityText(app))
-                    else -> showSection(app, "Versions", versionsText(app))
+    private fun beginVerifiedInstall(app: StoreApp) {
+        val session = sessionStore.loadSession()
+        if (session == null) {
+            renderAccountGate("Sign in before installing an app.")
+            return
+        }
+        showProgress("Verifying release and preparing installation…")
+        executor.execute {
+            runCatching {
+                installCoordinator.prepareAndInstall(
+                    session = session,
+                    appId = app.id,
+                    requestedVersionCode = app.versionCode,
+                    userPressedInstall = true
+                )
+            }.onSuccess { result ->
+                runOnUiThread {
+                    when (result) {
+                        is InstallFlowResult.InstallPermissionRequired -> {
+                            Toast.makeText(this, "Allow Aarulya Store as an install source, then press Install again.", Toast.LENGTH_LONG).show()
+                        }
+                        is InstallFlowResult.SessionCommitted -> {
+                            Toast.makeText(this, "Android installation confirmation opened.", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                    renderAuthenticated(session, refresh = false)
+                }
+            }.onFailure { error ->
+                runOnUiThread {
+                    AlertDialog.Builder(this)
+                        .setTitle("Installation blocked")
+                        .setMessage("A security or release requirement failed: ${safeError(error)}")
+                        .setPositiveButton("Close", null)
+                        .show()
+                    renderAuthenticated(session, refresh = false)
                 }
             }
-            .setNegativeButton("Back", null)
-            .show()
+        }
     }
 
-    private fun showSection(app: StoreApp, title: String, body: String) {
+    private fun showTrustDetails(app: StoreApp) {
         AlertDialog.Builder(this)
-            .setTitle("${app.name} — $title")
-            .setMessage(body)
-            .setPositiveButton("Close", null)
-            .setNeutralButton("All trust details") { _, _ -> showTrustMenu(app) }
+            .setTitle("Verified Trust Receipt")
+            .setMessage(
+                "${app.name} requires all of the following for the exact APK digest:\n\n" +
+                    "• Aarulya source and asset ownership\n" +
+                    "• Pinned release-signing public key\n" +
+                    "• APK package, version, digest and signer verification\n" +
+                    "• Permission and privacy review\n" +
+                    "• Malware, static, dynamic and abuse tests\n" +
+                    "• Build provenance and SBOM\n" +
+                    "• Signed final evidence report and transparency inclusion\n\n" +
+                    "Any missing, expired or mismatched evidence blocks download and install."
+            )
+            .setPositiveButton("Understood", null)
             .show()
     }
 
-    private fun aboutText(app: StoreApp): String =
-        "${app.summary}\n\n" +
-            "Publisher: Aarulya DigitalWorks\n" +
-            "Package: ${app.packageId}\n" +
-            "Category: ${app.category}\n" +
-            "Current state: ${app.statusLabel}\n\n" +
-            "This listing is a development record, not a production-release claim."
+    private fun showProgress(message: String) {
+        setContentView(TextView(this).apply {
+            text = message
+            textSize = 17f
+            gravity = android.view.Gravity.CENTER
+            setPadding(48, 48, 48, 48)
+        })
+    }
 
-    private fun dataSafetyText(app: StoreApp): String =
-        "No production data-safety declaration has been approved for ${app.name} yet.\n\n" +
-            "Publication requires a reviewed data inventory, purpose limitation, retention rules, deletion flow, encryption evidence, third-party processor list and signed privacy approval. Missing evidence blocks download."
-
-    private fun permissionsText(app: StoreApp): String =
-        "No permission is approved merely because this listing exists.\n\n" +
-            "The final APK must request only feature-essential permissions, explain each request before Android shows it, keep unrelated features working after denial and provide a tested revocation flow. Sensitive permissions require an elevated review."
-
-    private fun securityText(app: StoreApp): String =
-        "Required before publication:\n\n" +
-            "• Aarulya source ownership\n" +
-            "• Package and signer verification\n" +
-            "• APK SHA-256\n" +
-            "• Permission and privacy review\n" +
-            "• Malware and dependency scans\n" +
-            "• Build provenance and SBOM\n" +
-            "• Tamper, replay and rollback tests\n" +
-            "• Signed final evidence report\n\n" +
-            "Any failed, missing, expired or mismatched evidence keeps download and install blocked."
-
-    private fun versionsText(app: StoreApp): String =
-        "No verified public version is available for ${app.name}.\n\n" +
-            "Version history will show only signed Aarulya releases with exact package ID, version code, APK digest, signing-certificate fingerprint, publication time, security review and revocation state."
+    private fun safeError(error: Throwable): String = (error.message ?: error.javaClass.simpleName)
+        .replace(Regex("[\\r\\n\\t]+"), " ")
+        .take(180)
 }
