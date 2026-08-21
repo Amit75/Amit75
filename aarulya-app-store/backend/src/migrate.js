@@ -18,6 +18,18 @@ function digest(content) {
   return createHash('sha256').update(content).digest('hex');
 }
 
+function transactionBody(filename, sql) {
+  const hasBegin = /^\s*BEGIN;\s*/i.test(sql);
+  const hasCommit = /\s*COMMIT;\s*$/i.test(sql);
+  if (!hasBegin || !hasCommit) throw new Error(`migration-transaction-wrapper-required:${filename}`);
+  const body = sql.replace(/^\s*BEGIN;\s*/i, '').replace(/\s*COMMIT;\s*$/i, '').trim();
+  if (!body) throw new Error(`empty-migration-body:${filename}`);
+  if (/^\s*(BEGIN|COMMIT|ROLLBACK)\b/im.test(body)) {
+    throw new Error(`nested-top-level-transaction-prohibited:${filename}`);
+  }
+  return body;
+}
+
 const client = await pool.connect();
 try {
   await client.query('SELECT pg_advisory_lock($1)', [lockId]);
@@ -47,12 +59,22 @@ try {
       continue;
     }
 
+    const body = transactionBody(filename, sql);
     console.log(`APPLY ${filename} ${sha256}`);
-    await client.query(sql);
-    await client.query(
-      'INSERT INTO public.aarulya_store_schema_migrations (filename, sha256) VALUES ($1, $2)',
-      [filename, sha256]
-    );
+    await client.query('BEGIN');
+    try {
+      await client.query("SET LOCAL lock_timeout TO '5s'");
+      await client.query("SET LOCAL statement_timeout TO '60s'");
+      await client.query(body);
+      await client.query(
+        'INSERT INTO public.aarulya_store_schema_migrations (filename, sha256) VALUES ($1, $2)',
+        [filename, sha256]
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    }
   }
   console.log('AARULYA_STORE_MIGRATIONS=PASS');
 } finally {
