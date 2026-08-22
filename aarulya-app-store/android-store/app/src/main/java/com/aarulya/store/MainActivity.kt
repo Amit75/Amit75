@@ -3,8 +3,15 @@ package com.aarulya.store
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import com.aarulya.store.auth.OidcPkceClient
@@ -30,6 +37,12 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = Color.WHITE
+        window.navigationBarColor = Color.WHITE
+        window.decorView.systemUiVisibility =
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+
         sessionStore = SecureSessionStore(this)
         oidc = OidcPkceClient(sessionStore)
         catalogRepository = RemoteCatalogRepository()
@@ -73,7 +86,7 @@ class MainActivity : Activity() {
 
     private fun renderAccountGate(message: String? = null) {
         StoreCatalog.clearAuthenticatedRemoteCatalog()
-        setContentView(AccountGateView(this, message, ::beginLogin).build())
+        setContentViewSmooth(AccountGateView(this, message, ::beginLogin).build())
     }
 
     private fun beginLogin() {
@@ -90,7 +103,7 @@ class MainActivity : Activity() {
             renderAccountGate("Your session expired. Sign in again.")
             return
         }
-        setContentView(StoreHomeView(this, ::showAppDetails).build())
+        setContentViewSmooth(StoreHomeView(this, ::showAppDetails).build())
         if (!refresh) return
 
         executor.execute {
@@ -98,7 +111,7 @@ class MainActivity : Activity() {
                 catalogRepository.refresh(session)
                 receiptUploader.uploadPending(session)
             }.onSuccess {
-                runOnUiThread { setContentView(StoreHomeView(this, ::showAppDetails).build()) }
+                runOnUiThread { setContentViewSmooth(StoreHomeView(this, ::showAppDetails).build()) }
             }.onFailure { error ->
                 if (error.message?.contains("401") == true || error.message?.contains("authentication") == true) {
                     sessionStore.clear()
@@ -197,13 +210,39 @@ class MainActivity : Activity() {
     }
 
     private fun showProgress(message: String) {
-        setContentView(TextView(this).apply {
-            text = message
-            textSize = 17f
-            gravity = android.view.Gravity.CENTER
-            setPadding(48, 48, 48, 48)
-        })
+        val view = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(40), dp(40), dp(40), dp(40))
+            setBackgroundColor(Color.rgb(248, 250, 252))
+            addView(ImageView(this@MainActivity).apply {
+                setImageResource(R.drawable.ic_aarulya_mark)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = "Aarulya Store logo"
+            }, LinearLayout.LayoutParams(dp(82), dp(82)))
+            addView(ProgressBar(this@MainActivity).apply {
+                isIndeterminate = true
+                contentDescription = "Loading"
+            }, LinearLayout.LayoutParams(dp(42), dp(42)).apply { topMargin = dp(24) })
+            addView(TextView(this@MainActivity).apply {
+                text = message
+                textSize = 16f
+                gravity = Gravity.CENTER
+                setTextColor(Color.rgb(71, 85, 105))
+                includeFontPadding = false
+                setPadding(0, dp(18), 0, 0)
+            })
+        }
+        setContentViewSmooth(view)
     }
+
+    private fun setContentViewSmooth(view: View) {
+        view.alpha = 0f
+        setContentView(view)
+        view.animate().alpha(1f).setDuration(160L).start()
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun safeError(error: Throwable): String = (error.message ?: error.javaClass.simpleName)
         .replace(Regex("[\\r\\n\\t]+"), " ")
