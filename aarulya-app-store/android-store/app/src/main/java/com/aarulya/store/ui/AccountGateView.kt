@@ -1,14 +1,17 @@
 package com.aarulya.store.ui
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.view.Gravity
 import android.view.View
-import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.aarulya.store.R
 
 class AccountGateView(
     private val context: Context,
@@ -21,65 +24,77 @@ class AccountGateView(
         setPadding(dp(28), dp(32), dp(28), dp(32))
         setBackgroundColor(Color.rgb(248, 250, 252))
 
-        addView(TextView(context).apply {
-            text = "A"
-            textSize = 34f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            setTypeface(typeface, Typeface.BOLD)
-            background = rounded(Color.rgb(15, 30, 46), 28f, Color.rgb(245, 192, 106))
-        }, LinearLayout.LayoutParams(dp(88), dp(88)))
+        addView(ImageView(context).apply {
+            setImageResource(R.drawable.ic_aarulya_mark)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "Aarulya Store logo"
+        }, LinearLayout.LayoutParams(dp(92), dp(92)))
 
-        addView(TextView(context).apply {
-            text = "Aarulya Store"
-            textSize = 28f
+        addView(label("Aarulya Store", 28f, Color.rgb(11, 15, 26), Typeface.BOLD).apply {
             gravity = Gravity.CENTER
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.rgb(11, 15, 26))
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = dp(20) })
 
-        addView(TextView(context).apply {
-            text = "Account verification is required. Guest browsing is disabled so downloads, devices, updates and evidence receipts stay bound to the correct user."
-            textSize = 15f
+        addView(label(
+            "Secure sign-in keeps downloads, devices, updates and evidence receipts bound to the correct account.",
+            15f,
+            Color.rgb(71, 85, 105),
+            Typeface.NORMAL
+        ).apply {
             gravity = Gravity.CENTER
-            setTextColor(Color.rgb(71, 85, 105))
+            setLineSpacing(0f, 1.1f)
             setPadding(0, dp(12), 0, dp(16))
         })
 
         message?.let { value ->
-            addView(TextView(context).apply {
-                text = value
-                textSize = 13f
+            addView(label(value, 13f, Color.rgb(153, 27, 27), Typeface.NORMAL).apply {
                 gravity = Gravity.CENTER
-                setTextColor(Color.rgb(153, 27, 27))
-                setPadding(dp(12), dp(10), dp(12), dp(10))
-                background = rounded(Color.rgb(254, 242, 242), 14f)
-            })
+                setPadding(dp(12), dp(11), dp(12), dp(11))
+                background = rounded(Color.rgb(254, 242, 242), 14f, Color.rgb(254, 202, 202))
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
         }
 
-        addView(Button(context).apply {
-            text = "Sign in securely"
-            isAllCaps = false
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            background = rounded(Color.rgb(30, 107, 255), 20f)
+        addView(label("Sign in securely", 16f, Color.WHITE, Typeface.BOLD).apply {
+            gravity = Gravity.CENTER
+            background = clickableRounded(Color.rgb(30, 107, 255), 20f)
+            contentDescription = "Sign in securely to Aarulya Store"
+            isClickable = true
+            isFocusable = true
             setOnClickListener { onSignIn() }
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(54)
+            dp(56)
         ).apply { topMargin = dp(18) })
 
-        addView(TextView(context).apply {
-            text = "No password, OTP, access token or recovery secret is stored in plaintext. Authentication opens only the trusted Aarulya identity origin."
-            textSize = 12f
+        addView(label(
+            "No password, OTP, access token or recovery secret is stored in plaintext.",
+            12f,
+            Color.rgb(100, 116, 139),
+            Typeface.NORMAL
+        ).apply {
             gravity = Gravity.CENTER
-            setTextColor(Color.rgb(100, 116, 139))
             setPadding(0, dp(18), 0, 0)
         })
     }
+
+    private fun label(value: String, size: Float, color: Int, style: Int): TextView = TextView(context).apply {
+        text = value
+        textSize = size
+        includeFontPadding = false
+        setTextColor(color)
+        setTypeface(typeface, style)
+    }
+
+    private fun clickableRounded(fill: Int, radiusDp: Float): RippleDrawable = RippleDrawable(
+        ColorStateList.valueOf(Color.argb(42, 255, 255, 255)),
+        rounded(fill, radiusDp),
+        rounded(Color.WHITE, radiusDp)
+    )
 
     private fun rounded(fill: Int, radiusDp: Float, stroke: Int? = null): GradientDrawable = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
