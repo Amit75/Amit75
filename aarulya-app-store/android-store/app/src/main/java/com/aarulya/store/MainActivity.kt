@@ -34,6 +34,7 @@ class MainActivity : Activity() {
     private lateinit var catalogRepository: RemoteCatalogRepository
     private lateinit var installCoordinator: StoreInstallCoordinator
     private lateinit var receiptUploader: InstallReceiptUploader
+    @Volatile private var destroyed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,25 +59,32 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        destroyed = true
         executor.shutdownNow()
         super.onDestroy()
     }
 
     private fun handleIntent(intent: Intent?) {
         val callback = intent?.data
-        if (callback?.scheme == "aarulya-store" && callback.host == "oauth") {
+        if (callback != null && isTrustedCallback(callback)) {
             showProgress("Verifying secure sign-in…")
             executor.execute {
                 runCatching { oidc.exchangeCallback(callback) }
                     .onSuccess { session ->
                         sessionStore.saveSession(session)
-                        runOnUiThread { renderAuthenticated(session, refresh = true) }
+                        onUi { renderAuthenticated(session, refresh = true) }
                     }
                     .onFailure { error ->
                         sessionStore.clear()
-                        runOnUiThread { renderAccountGate("Sign-in failed: ${safeError(error)}") }
+                        onUi { renderAccountGate("Sign-in failed: ${safeError(error)}") }
                     }
             }
+            return
+        }
+
+        if (callback != null && callback.getQueryParameter("code") != null) {
+            sessionStore.clear()
+            renderAccountGate("Untrusted sign-in callback was blocked.")
             return
         }
 
@@ -84,20 +92,32 @@ class MainActivity : Activity() {
         if (session == null) renderAccountGate() else renderAuthenticated(session, refresh = true)
     }
 
+    private fun isTrustedCallback(uri: Uri): Boolean {
+        val expected = Uri.parse(BuildConfig.OIDC_REDIRECT_URI)
+        return uri.scheme == "https" &&
+            uri.scheme == expected.scheme &&
+            uri.host == expected.host &&
+            uri.path == expected.path &&
+            uri.port == -1
+    }
+
     private fun renderAccountGate(message: String? = null) {
+        if (destroyed) return
         StoreCatalog.clearAuthenticatedRemoteCatalog()
         setContentViewSmooth(AccountGateView(this, message, ::beginLogin).build())
     }
 
     private fun beginLogin() {
         val uri = oidc.createAuthorizationUri()
-        require(uri.scheme == "https" && uri.host == Uri.parse(BuildConfig.IDENTITY_ORIGIN).host) {
+        val identity = Uri.parse(BuildConfig.IDENTITY_ORIGIN)
+        require(uri.scheme == "https" && uri.host == identity.host && uri.port == -1) {
             "trusted-identity-origin-required"
         }
         startActivity(Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE))
     }
 
     private fun renderAuthenticated(session: StoreSession, refresh: Boolean) {
+        if (destroyed) return
         if (!session.isUsable()) {
             sessionStore.clear()
             renderAccountGate("Your session expired. Sign in again.")
@@ -111,13 +131,13 @@ class MainActivity : Activity() {
                 catalogRepository.refresh(session)
                 receiptUploader.uploadPending(session)
             }.onSuccess {
-                runOnUiThread { setContentViewSmooth(StoreHomeView(this, ::showAppDetails).build()) }
+                onUi { setContentViewSmooth(StoreHomeView(this, ::showAppDetails).build()) }
             }.onFailure { error ->
                 if (error.message?.contains("401") == true || error.message?.contains("authentication") == true) {
                     sessionStore.clear()
-                    runOnUiThread { renderAccountGate("Session verification failed. Sign in again.") }
+                    onUi { renderAccountGate("Session verification failed. Sign in again.") }
                 } else {
-                    runOnUiThread {
+                    onUi {
                         Toast.makeText(this, "Store sync unavailable: ${safeError(error)}", Toast.LENGTH_LONG).show()
                     }
                 }
@@ -126,6 +146,7 @@ class MainActivity : Activity() {
     }
 
     private fun showAppDetails(app: StoreApp) {
+        if (destroyed) return
         val releaseMessage = if (app.statusLabel.equals("published", ignoreCase = true)) {
             "Install remains blocked unless the signed release envelope, pinned key, APK digest, signer, ownership, privacy, malware and final evidence checks all pass."
         } else {
@@ -167,7 +188,7 @@ class MainActivity : Activity() {
                     userPressedInstall = true
                 )
             }.onSuccess { result ->
-                runOnUiThread {
+                onUi {
                     when (result) {
                         is InstallFlowResult.InstallPermissionRequired -> {
                             Toast.makeText(this, "Allow Aarulya Store as an install source, then press Install again.", Toast.LENGTH_LONG).show()
@@ -179,7 +200,7 @@ class MainActivity : Activity() {
                     renderAuthenticated(session, refresh = false)
                 }
             }.onFailure { error ->
-                runOnUiThread {
+                onUi {
                     AlertDialog.Builder(this)
                         .setTitle("Installation blocked")
                         .setMessage("A security or release requirement failed: ${safeError(error)}")
@@ -192,6 +213,7 @@ class MainActivity : Activity() {
     }
 
     private fun showTrustDetails(app: StoreApp) {
+        if (destroyed) return
         AlertDialog.Builder(this)
             .setTitle("Verified Trust Receipt")
             .setMessage(
@@ -210,6 +232,7 @@ class MainActivity : Activity() {
     }
 
     private fun showProgress(message: String) {
+        if (destroyed) return
         val view = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -237,9 +260,17 @@ class MainActivity : Activity() {
     }
 
     private fun setContentViewSmooth(view: View) {
+        if (destroyed) return
         view.alpha = 0f
         setContentView(view)
         view.animate().alpha(1f).setDuration(160L).start()
+    }
+
+    private fun onUi(action: () -> Unit) {
+        if (destroyed) return
+        runOnUiThread {
+            if (!destroyed && !isFinishing && !isDestroyed) action()
+        }
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
