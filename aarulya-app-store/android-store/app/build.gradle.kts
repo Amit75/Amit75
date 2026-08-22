@@ -112,7 +112,9 @@ val validateExternalReleaseSigning by tasks.registering {
         require(!releaseKeyPassword.orNull.isNullOrBlank()) {
             "Release build blocked: signing key password was not injected"
         }
-        require(signingFile.canonicalPath !in project.projectDir.canonicalPath) {
+        val repositoryRoot = project.rootDir.canonicalFile.toPath()
+        val signingPath = signingFile.canonicalFile.toPath()
+        require(!signingPath.startsWith(repositoryRoot)) {
             "Release build blocked: signing material must remain outside the repository"
         }
     }
