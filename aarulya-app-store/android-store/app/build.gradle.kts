@@ -4,6 +4,10 @@ plugins {
 }
 
 val trustedReleaseKeyFingerprints = providers.gradleProperty("aarulyaReleaseKeyFingerprints").orElse("")
+val releaseStoreFilePath = providers.environmentVariable("AARULYA_ANDROID_SIGNING_STORE_FILE")
+val releaseStorePassword = providers.environmentVariable("AARULYA_ANDROID_SIGNING_STORE_PASSWORD")
+val releaseKeyAlias = providers.environmentVariable("AARULYA_ANDROID_SIGNING_KEY_ALIAS")
+val releaseKeyPassword = providers.environmentVariable("AARULYA_ANDROID_SIGNING_KEY_PASSWORD")
 
 android {
     namespace = "com.aarulya.store"
@@ -30,6 +34,18 @@ android {
         )
     }
 
+    signingConfigs {
+        create("aarulyaRelease") {
+            storeFile = releaseStoreFilePath.orNull?.let(::file)
+            storePassword = releaseStorePassword.orNull
+            keyAlias = releaseKeyAlias.orNull
+            keyPassword = releaseKeyPassword.orNull
+            enableV1Signing = false
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -39,6 +55,7 @@ android {
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("aarulyaRelease")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -80,6 +97,27 @@ val validateReleaseTrustRoots by tasks.registering {
     }
 }
 
+val validateExternalReleaseSigning by tasks.registering {
+    doLast {
+        val signingFile = releaseStoreFilePath.orNull?.let(::file)
+        require(signingFile?.isFile == true) {
+            "Release build blocked: external Aarulya signing store file is missing"
+        }
+        require(!releaseStorePassword.orNull.isNullOrBlank()) {
+            "Release build blocked: signing store password was not injected"
+        }
+        require(!releaseKeyAlias.orNull.isNullOrBlank()) {
+            "Release build blocked: signing key alias was not injected"
+        }
+        require(!releaseKeyPassword.orNull.isNullOrBlank()) {
+            "Release build blocked: signing key password was not injected"
+        }
+        require(signingFile.canonicalPath !in project.projectDir.canonicalPath) {
+            "Release build blocked: signing material must remain outside the repository"
+        }
+    }
+}
+
 tasks.matching { it.name == "preReleaseBuild" }.configureEach {
-    dependsOn(validateReleaseTrustRoots)
+    dependsOn(validateReleaseTrustRoots, validateExternalReleaseSigning)
 }
