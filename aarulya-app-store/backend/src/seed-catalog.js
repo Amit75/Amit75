@@ -8,12 +8,35 @@ if (!/^[a-f0-9]{40,64}$/.test(sourceCommitSha)) throw new Error('source-commit-s
 if (!Array.isArray(APP_CATALOG) || APP_CATALOG.length === 0) throw new Error('nonempty-aarulya-catalog-required');
 
 const allowedLifecycle = new Set(['planned', 'in-development', 'source-foundation', 'private-test']);
+const criticalPackages = new Set([
+  'com.aarulya.store',
+  'com.aarulya.browser',
+  'com.aarulya.pay',
+  'com.aarulya.sentinel',
+  'com.aarulya.cloud',
+  'com.aarulya.owner',
+  'com.aarulya.security.vault'
+]);
+const elevatedCategories = new Set([
+  'Finance',
+  'Documents',
+  'Kids & Family',
+  'Business',
+  'Cloud & Files',
+  'Safety'
+]);
+
 const normalized = APP_CATALOG.map((app, index) => {
   if (!/^com\.aarulya(?:\.[a-z][a-z0-9_]*)+$/.test(app.packageId || '')) {
     throw new Error(`non-aarulya-package-in-catalog:${app.id}`);
   }
   const lifecycleStatus = String(app.status || 'planned');
   if (!allowedLifecycle.has(lifecycleStatus)) throw new Error(`invalid-catalog-lifecycle:${app.id}`);
+  const riskTier = criticalPackages.has(app.packageId)
+    ? 'critical'
+    : elevatedCategories.has(String(app.category))
+      ? 'elevated'
+      : 'standard';
   return Object.freeze({
     id: String(app.id),
     packageId: String(app.packageId),
@@ -22,6 +45,7 @@ const normalized = APP_CATALOG.map((app, index) => {
     description: String(app.description || ''),
     ageLabel: String(app.age || 'Not rated'),
     lifecycleStatus,
+    riskTier,
     childDirected: String(app.category) === 'Kids & Family',
     featured: index < 8,
     sortPriority: index + 1
@@ -44,8 +68,8 @@ try {
       await client.query(
         `INSERT INTO apps
           (id, package_id, publisher, name, category, description, age_label,
-           lifecycle_status, child_directed, visibility, featured, sort_priority)
-         VALUES ($1, $2, 'Aarulya', $3, $4, $5, $6, $7, $8, 'visible', $9, $10)
+           lifecycle_status, risk_tier, child_directed, visibility, featured, sort_priority)
+         VALUES ($1, $2, 'Aarulya', $3, $4, $5, $6, $7, $8, $9, 'visible', $10, $11)
          ON CONFLICT (id) DO UPDATE SET
            package_id = EXCLUDED.package_id,
            publisher = 'Aarulya',
@@ -54,6 +78,7 @@ try {
            description = EXCLUDED.description,
            age_label = EXCLUDED.age_label,
            lifecycle_status = CASE WHEN apps.lifecycle_status = 'retired' THEN 'retired' ELSE EXCLUDED.lifecycle_status END,
+           risk_tier = EXCLUDED.risk_tier,
            child_directed = EXCLUDED.child_directed,
            visibility = CASE WHEN apps.visibility = 'retired' THEN 'retired' ELSE 'visible' END,
            featured = EXCLUDED.featured,
@@ -61,7 +86,8 @@ try {
            metadata_revision = apps.metadata_revision + 1,
            updated_at = now()`,
         [app.id, app.packageId, app.name, app.category, app.description,
-          app.ageLabel, app.lifecycleStatus, app.childDirected, app.featured, app.sortPriority]
+          app.ageLabel, app.lifecycleStatus, app.riskTier, app.childDirected,
+          app.featured, app.sortPriority]
       );
     }
     await client.query(
