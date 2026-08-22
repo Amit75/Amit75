@@ -39,7 +39,7 @@ test('app detail view exposes explicit data safety, permissions, security and ve
     assert.match(activity, new RegExp(`"${section}"`));
   }
   assert.match(activity, /Missing evidence blocks download/);
-  assert.match(activity, /No verified public version is available/);
+  assert.match(activity, /No verified public release is available/);
   assert.match(activity, /development record, not a production-release claim/);
 });
 
@@ -53,4 +53,37 @@ test('Android build keeps storefront, API, downloads and evidence on isolated or
   assert.match(build, /isDebuggable = false/);
   assert.match(build, /isMinifyEnabled = true/);
   assert.match(build, /warningsAsErrors = true/);
+});
+
+test('Aarulya logo, adaptive icon and clean theme are applied consistently', async () => {
+  const manifest = await source('app/src/main/AndroidManifest.xml');
+  const mark = await source('app/src/main/res/drawable/ic_aarulya_mark.xml');
+  const adaptive = await source('app/src/main/res/mipmap-anydpi-v33/ic_launcher.xml');
+  const theme = await source('app/src/main/res/values/styles.xml');
+  const home = await source('app/src/main/java/com/aarulya/store/ui/StoreHomeView.kt');
+  const gate = await source('app/src/main/java/com/aarulya/store/ui/AccountGateView.kt');
+
+  assert.match(manifest, /android:icon="@mipmap\/ic_launcher"/);
+  assert.match(manifest, /android:roundIcon="@mipmap\/ic_launcher_round"/);
+  assert.match(manifest, /android:theme="@style\/Theme\.AarulyaStore"/);
+  assert.match(mark, /#F5C06A/);
+  assert.match(mark, /#00D4E0/);
+  assert.match(adaptive, /<monochrome/);
+  assert.match(theme, /Theme\.AarulyaStore/);
+  assert.match(home, /R\.drawable\.ic_aarulya_mark/);
+  assert.match(gate, /R\.drawable\.ic_aarulya_mark/);
+});
+
+test('Store interaction avoids per-keystroke heavy rendering and provides motion feedback', async () => {
+  const home = await source('app/src/main/java/com/aarulya/store/ui/StoreHomeView.kt');
+  const activity = await source('app/src/main/java/com/aarulya/store/MainActivity.kt');
+
+  assert.match(home, /SEARCH_DEBOUNCE_MS = 180L/);
+  assert.match(home, /postDelayed/);
+  assert.match(home, /RippleDrawable/);
+  assert.match(home, /isSmoothScrollingEnabled = true/);
+  assert.match(home, /setDuration\(140L\)/);
+  assert.match(activity, /setContentViewSmooth/);
+  assert.match(activity, /setDuration\(160L\)/);
+  assert.match(activity, /R\.drawable\.ic_aarulya_mark/);
 });
