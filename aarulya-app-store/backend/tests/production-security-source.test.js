@@ -22,18 +22,27 @@ test('production API cannot start with stub authentication or missing release re
   assert.doesNotMatch(server, /releaseRepository:\s*null/);
   assert.match(server, /createProductionComposition/);
   assert.match(server, /releaseEnvelopeRepository/);
+  assert.match(server, /publicationService/);
   assert.match(composition, /createOidcAccessTokenVerifier/);
-  assert.match(composition, /upsertUser/);
+  assert.match(composition, /PostgreSqlIdentityRepository/);
+  assert.match(composition, /identityRepository\.resolveUser/);
+  assert.match(composition, /PostgreSqlPublicationRepository/);
+  assert.match(composition, /createPublicationService/);
   assert.match(http, /store-authenticator-required/);
   assert.match(http, /release-envelope-repository-required/);
+  assert.match(http, /publication-service-required/);
   assert.match(http, /store:download/);
   assert.match(http, /store:install/);
+  assert.match(http, /store:release:publish/);
+  assert.match(http, /stepUp: true/);
 });
 
 test('database and release migrations require immutable signed evidence', async () => {
   const core = await backend('sql/0001_core.sql');
   const evidence = await backend('sql/0002_release_identity_and_artifacts.sql');
   const envelopes = await backend('sql/0003_signed_release_envelopes.sql');
+  const approvals = await backend('sql/0008_release_approvals_and_risk_tiers.sql');
+  const receipts = await backend('sql/0009_publication_receipts.sql');
 
   assert.match(core, /ENABLE ROW LEVEL SECURITY/);
   assert.match(core, /enforce_signer_continuity/);
@@ -45,15 +54,17 @@ test('database and release migrations require immutable signed evidence', async 
   assert.match(envelopes, /signed_release_envelopes_immutable/);
   assert.match(envelopes, /canonical_payload_base64/);
   assert.match(envelopes, /transparency_inclusion/);
+  assert.match(approvals, /release_approvals_immutable/);
+  assert.match(approvals, /approval_threshold/);
+  assert.match(approvals, /independent-security-reviewer/);
+  assert.match(receipts, /release_publication_receipts_immutable/);
 });
 
 test('artifact services enforce one-time grant consumption and exact digest before streaming', async () => {
   const repository = await backend('src/artifact-repository.js');
   const server = await backend('src/artifact-server.js');
 
-  assert.match(repository, /consumed_at IS NULL/);
-  assert.match(repository, /g\.expires_at > now\(\)/);
-  assert.match(repository, /distribution_kill_switches/);
+  assert.match(repository, /consume_download_grant/);
   assert.match(server, /timingSafeEqual/);
   assert.match(server, /artifact-digest-mismatch/);
   assert.match(server, /application\/vnd\.android\.package-archive/);
@@ -61,13 +72,16 @@ test('artifact services enforce one-time grant consumption and exact digest befo
   assert.doesNotMatch(server, /createReadStream\([^)]*request/);
 });
 
-test('Android release build and install flow fail closed without pinned trust roots', async () => {
+test('Android release build and install flow fail closed without signing identity and pinned trust roots', async () => {
   const build = await store('android-store/app/build.gradle.kts');
   const envelope = await store('android-store/app/src/main/java/com/aarulya/store/security/ReleaseEnvelopeVerifier.kt');
   const downloader = await store('android-store/app/src/main/java/com/aarulya/store/download/SecureApkDownloader.kt');
   const verifier = await store('android-store/app/src/main/java/com/aarulya/store/install/VerifiedApkVerifier.kt');
 
   assert.match(build, /validateReleaseTrustRoots/);
+  assert.match(build, /validateExternalReleaseSigning/);
+  assert.match(build, /AARULYA_ANDROID_SIGNING_STORE_FILE/);
+  assert.match(build, /signing material must remain outside the repository/);
   assert.match(build, /aarulyaReleaseKeyFingerprints/);
   assert.match(envelope, /no-pinned-release-trust-root/);
   assert.match(envelope, /release-key-not-pinned-in-store-apk/);
