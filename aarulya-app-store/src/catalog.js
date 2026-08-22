@@ -1,4 +1,5 @@
 export const APP_CATALOG = Object.freeze([
+  { id:'aarulya-store', name:'Aarulya Store', packageId:'com.aarulya.store', category:'Apps', status:'in-development', age:'3+', description:'First-party Aarulya app discovery, verified downloads, installation, updates and Trust Receipts.' },
   { id:'aarulya-play', name:'Aarulya Play', packageId:'com.aarulya.play', category:'Games', status:'in-development', age:'7+', description:'Original family games, battles, missions and safe virtual rewards.' },
   { id:'aarulya-saathi', name:'Aarulya Saathi', packageId:'com.aarulya.saathi', category:'AI & Productivity', status:'in-development', age:'13+', description:'Private assistant for projects, files, research and daily work.' },
   { id:'aaru-browser', name:'Aaru Browser', packageId:'com.aarulya.browser', category:'Internet', status:'in-development', age:'13+', description:'Privacy-first browser and search companion.' },
