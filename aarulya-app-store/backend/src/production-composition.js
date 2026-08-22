@@ -5,6 +5,8 @@ import { PostgreSqlIdentityRepository } from './identity-repository.js';
 import { PostgreSqlStoreRepository } from './postgres-store-repository.js';
 import { PostgreSqlJobRepository } from './postgres-job-repository.js';
 import { PostgreSqlReleaseEnvelopeRepository } from './release-envelope-repository.js';
+import { PostgreSqlPublicationRepository } from './publication-repository.js';
+import { createPublicationService } from './publication-service.js';
 import { createPersistentStoreService } from './persistent-store-service.js';
 
 export function createProductionComposition({ env = process.env, catalog } = {}) {
@@ -16,6 +18,8 @@ export function createProductionComposition({ env = process.env, catalog } = {})
   });
   const jobRepository = new PostgreSqlJobRepository(pool);
   const releaseEnvelopeRepository = new PostgreSqlReleaseEnvelopeRepository(pool);
+  const publicationRepository = new PostgreSqlPublicationRepository(pool);
+  const publicationService = createPublicationService({ publicationRepository });
   const oidc = createOidcAccessTokenVerifier(oidcConfigurationFromEnvironment(env));
   const bearer = createBearerAuthenticator({
     verifyAccessToken: oidc.verifyAccessToken,
@@ -47,6 +51,8 @@ export function createProductionComposition({ env = process.env, catalog } = {})
     storeRepository,
     jobRepository,
     releaseEnvelopeRepository,
+    publicationRepository,
+    publicationService,
     service,
     authenticate,
     async close() {
