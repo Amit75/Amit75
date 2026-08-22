@@ -24,6 +24,7 @@ const handler = createHttpHandler({
   authenticate: composition.authenticate,
   releaseRepository: composition.storeRepository,
   releaseEnvelopeRepository: composition.releaseEnvelopeRepository,
+  publicationService: composition.publicationService,
   allowedOrigins: [CANONICAL_STOREFRONT_ORIGIN]
 });
 
