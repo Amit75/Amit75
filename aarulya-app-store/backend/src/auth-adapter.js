@@ -46,6 +46,7 @@ export function createBearerAuthenticator({
   requiredAudience,
   now = () => Date.now(),
   clockSkewSeconds = 60,
+  maximumTokenLifetimeSeconds = 3600,
   revokedSessionLookup = async () => false,
   revokedTokenLookup = async () => false
 } = {}) {
@@ -61,12 +62,22 @@ export function createBearerAuthenticator({
     const claims = verification.claims || {};
     const nowSeconds = Math.floor(now() / 1000);
     const skew = Math.max(0, Math.min(Number(clockSkewSeconds) || 0, 300));
+    const maximumLifetime = Math.max(300, Math.min(Number(maximumTokenLifetimeSeconds) || 3600, 86_400));
+    const issuedAt = Number(claims.iat);
+    const expiresAt = Number(claims.exp);
+    const authenticationTime = Number(claims.auth_time);
 
     if (claims.iss !== trustedIssuer) throw unauthorized('token-issuer-invalid');
     if (!audienceMatches(claims.aud, requiredAudience)) throw unauthorized('token-audience-invalid');
     if (!claims.sub || String(claims.sub).length < 8) throw unauthorized('token-subject-required');
-    if (!Number.isFinite(Number(claims.exp)) || Number(claims.exp) <= nowSeconds - skew) throw unauthorized('token-expired');
+    if (!Number.isFinite(issuedAt)) throw unauthorized('token-issued-at-required');
+    if (issuedAt > nowSeconds + skew) throw unauthorized('token-issued-in-future');
+    if (!Number.isFinite(expiresAt) || expiresAt <= nowSeconds - skew) throw unauthorized('token-expired');
+    if (expiresAt <= issuedAt || expiresAt - issuedAt > maximumLifetime) throw unauthorized('token-lifetime-invalid');
     if (Number.isFinite(Number(claims.nbf)) && Number(claims.nbf) > nowSeconds + skew) throw unauthorized('token-not-yet-valid');
+    if (Number.isFinite(authenticationTime) && authenticationTime > nowSeconds + skew) {
+      throw unauthorized('authentication-time-invalid');
+    }
     if (!claims.jti || String(claims.jti).length < 8) throw unauthorized('token-id-required');
     if (!claims.sid || String(claims.sid).length < 8) throw unauthorized('session-id-required');
     if (await revokedTokenLookup(String(claims.jti))) throw unauthorized('token-revoked');
@@ -87,7 +98,9 @@ export function createBearerAuthenticator({
       scopes: Object.freeze([...scopes]),
       stepUpVerified: hasStepUp(claims),
       authorizedOwner: stringArray(claims.roles).includes('owner'),
-      authenticationTime: Number.isFinite(Number(claims.auth_time)) ? Number(claims.auth_time) : null
+      issuedAt,
+      expiresAt,
+      authenticationTime: Number.isFinite(authenticationTime) ? authenticationTime : null
     });
   };
 }
