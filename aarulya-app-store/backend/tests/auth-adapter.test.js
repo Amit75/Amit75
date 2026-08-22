@@ -77,7 +77,7 @@ test('rejects future, inverted and overlong token lifetimes', async () => {
   );
   await assert.rejects(
     authenticator({ claims: { iat: NOW_SECONDS, exp: NOW_SECONDS - 1 } })(request()),
-    (error) => error.code === 'token-expired'
+    (error) => error.code === 'token-lifetime-invalid'
   );
   await assert.rejects(
     authenticator({ claims: { iat: NOW_SECONDS - 30, exp: NOW_SECONDS + 7200 } })(request()),
