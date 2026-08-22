@@ -29,7 +29,7 @@ export async function claimNextJob(pool, workerId, supportedTypes, now = new Dat
       `WITH candidate AS (
          SELECT id, state AS prior_state
          FROM aarulya_store.jobs
-         WHERE state IN ('queued', 'retrying')
+         WHERE state IN ('queued', 'scheduled', 'retrying')
            AND type = ANY($5::text[])
            AND (run_at IS NULL OR run_at <= $1)
            AND attempt < max_attempts
