@@ -119,6 +119,9 @@ class StoreApiClient {
                 uri.port == -1 &&
                 uri.path?.startsWith("/v1/") == true
         ) { "trusted-api-origin-required" }
+        val bodyBytes = body?.toString()?.toByteArray(Charsets.UTF_8)
+        require(bodyBytes == null || bodyBytes.size <= 1024 * 1024) { "request-body-too-large" }
+
         val connection = (URL(uri.toString()).openConnection() as HttpURLConnection).apply {
             requestMethod = method
             connectTimeout = 10_000
@@ -130,17 +133,15 @@ class StoreApiClient {
             setRequestProperty("Cache-Control", "no-store")
             setRequestProperty("X-Request-Id", UUID.randomUUID().toString())
             idempotencyKey?.let { setRequestProperty("Idempotency-Key", it) }
-            if (body != null) {
+            if (bodyBytes != null) {
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
-                val bytes = body.toString().toByteArray(Charsets.UTF_8)
-                require(bytes.size <= 1024 * 1024) { "request-body-too-large" }
-                setFixedLengthStreamingMode(bytes.size)
-                outputStream.use { it.write(bytes) }
+                setFixedLengthStreamingMode(bodyBytes.size)
             }
         }
 
         try {
+            if (bodyBytes != null) connection.outputStream.use { it.write(bodyBytes) }
             val status = connection.responseCode
             if (status in 300..399) throw StoreApiException(status, "redirect-prohibited")
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
