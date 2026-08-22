@@ -8,6 +8,12 @@ on:
       - 'aarulya-app-store/backend/package.json'
       - 'aarulya-app-store/android-store/**'
       - '.github/workflows/aarulya-store-bootstrap-locks.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'aarulya-app-store/backend/package.json'
+      - 'aarulya-app-store/android-store/**'
+      - '.github/workflows/aarulya-store-bootstrap-locks.yml'
 
 permissions:
   contents: write
@@ -20,12 +26,20 @@ jobs:
   generate-and-verify-locks:
     if: >-
       github.repository == 'Amit75/Amit75' &&
-      github.ref == 'refs/heads/agent/aarulya-app-store-foundation' &&
-      !contains(github.event.head_commit.message || '', '[aarulya-lock-bootstrap]')
+      !contains(github.event.head_commit.message || '', '[aarulya-lock-bootstrap]') &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/agent/aarulya-app-store-foundation') ||
+        (
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.ref == 'agent/aarulya-app-store-foundation' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.user.login == 'Amit75'
+        )
+      )
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - name: Checkout exact branch head
+      - name: Checkout exact trusted branch head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: agent/aarulya-app-store-foundation
