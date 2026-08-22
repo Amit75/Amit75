@@ -1,0 +1,112 @@
+name: Aarulya Store reproducibility bootstrap
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [agent/aarulya-app-store-foundation]
+    paths:
+      - 'aarulya-app-store/backend/package.json'
+      - 'aarulya-app-store/android-store/**'
+      - '.github/workflows/aarulya-store-bootstrap-locks.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: aarulya-store-reproducibility-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  generate-and-verify-locks:
+    if: >-
+      github.repository == 'Amit75/Amit75' &&
+      github.ref == 'refs/heads/agent/aarulya-app-store-foundation' &&
+      !contains(github.event.head_commit.message || '', '[aarulya-lock-bootstrap]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: agent/aarulya-app-store-foundation
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Set up Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.23.2'
+          cache: npm
+          cache-dependency-path: aarulya-app-store/backend/package-lock.json
+
+      - name: Generate and verify npm lock
+        working-directory: aarulya-app-store/backend
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+
+      - name: Set up Java 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 9.5.0
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+        with:
+          gradle-version: '9.5.0'
+          cache-read-only: false
+
+      - name: Install Android SDK requirements
+        run: |
+          sdkmanager 'platforms;android-37' 'build-tools;36.0.0'
+
+      - name: Generate verified Gradle wrapper and dependency metadata
+        working-directory: aarulya-app-store/android-store
+        run: |
+          gradle wrapper \
+            --gradle-version 9.5.0 \
+            --distribution-type bin \
+            --gradle-distribution-sha256-sum 553c78f50dafcd54d65b9a444649057857469edf836431389695608536d6b746
+          ./gradlew --no-daemon :app:dependencies --write-locks --write-verification-metadata sha256
+
+      - name: Build with disposable CI-only signing identity
+        working-directory: aarulya-app-store/android-store
+        env:
+          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.jks
+          AARULYA_ANDROID_SIGNING_STORE_PASSWORD: ci-test-store-password
+          AARULYA_ANDROID_SIGNING_KEY_ALIAS: aarulya-store-ci-test
+          AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-key-password
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore "$AARULYA_ANDROID_SIGNING_STORE_FILE" \
+            -storepass "$AARULYA_ANDROID_SIGNING_STORE_PASSWORD" \
+            -alias "$AARULYA_ANDROID_SIGNING_KEY_ALIAS" \
+            -keypass "$AARULYA_ANDROID_SIGNING_KEY_PASSWORD" \
+            -keyalg RSA -keysize 3072 -validity 2 \
+            -dname 'CN=Aarulya Store CI Test, O=Aarulya CI, C=IN'
+          CI_TRUST_ROOT="$(printf 'aarulya-store-ci-test-release-root' | sha256sum | cut -d' ' -f1)"
+          ./gradlew --no-daemon \
+            -PaarulyaReleaseKeyFingerprints="$CI_TRUST_ROOT" \
+            :app:lintRelease :app:assembleDebug :app:assembleRelease
+          rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"
+
+      - name: Commit generated reproducibility files
+        run: |
+          git config user.name 'aarulya-store-lock-bot'
+          git config user.email 'owner@aarulya.com'
+          git add \
+            aarulya-app-store/backend/package-lock.json \
+            aarulya-app-store/android-store/gradlew \
+            aarulya-app-store/android-store/gradlew.bat \
+            aarulya-app-store/android-store/gradle/wrapper/gradle-wrapper.jar \
+            aarulya-app-store/android-store/gradle/wrapper/gradle-wrapper.properties \
+            aarulya-app-store/android-store/gradle/verification-metadata.xml \
+            'aarulya-app-store/android-store/**/gradle.lockfile'
+          if git diff --cached --quiet; then
+            echo 'Reproducibility files are already current.'
+          else
+            git commit -m 'Lock Aarulya Store reproducible builds [aarulya-lock-bootstrap]'
+            git push origin HEAD:agent/aarulya-app-store-foundation
+          fi
