@@ -1,0 +1,187 @@
+name: Aarulya Store end-to-end source verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [agent/aarulya-app-store-foundation]
+    paths:
+      - 'aarulya-app-store/**'
+      - '.github/workflows/aarulya-store-verify.yml'
+  pull_request:
+    paths:
+      - 'aarulya-app-store/**'
+      - '.github/workflows/aarulya-store-verify.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aarulya-store-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-database-and-packaging:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:17.10-bookworm@sha256:9b18b78397054fce88a9552e9d5a3ad5bb7fd258c5b3cc1c5028e46373d6ea8f
+        env:
+          POSTGRES_PASSWORD: aarulya-ci-only-password
+          POSTGRES_DB: aarulya_store_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d aarulya_store_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.23.2'
+          cache: npm
+          cache-dependency-path: aarulya-app-store/backend/package-lock.json
+
+      - name: Verify locked backend dependencies and tests
+        working-directory: aarulya-app-store/backend
+        run: |
+          test -f package-lock.json
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          npm audit --omit=dev --audit-level=high
+
+      - name: Apply every PostgreSQL migration
+        env:
+          PGPASSWORD: aarulya-ci-only-password
+        run: |
+          psql -h 127.0.0.1 -U postgres -d aarulya_store_ci -v ON_ERROR_STOP=1 \
+            -f aarulya-app-store/backend/bootstrap/roles.sql
+          for migration in aarulya-app-store/backend/sql/*.sql; do
+            echo "Applying $migration"
+            psql -h 127.0.0.1 -U postgres -d aarulya_store_ci -v ON_ERROR_STOP=1 -f "$migration"
+          done
+
+      - name: Verify least-privilege database boundaries
+        env:
+          PGPASSWORD: aarulya-ci-only-password
+        run: |
+          psql -h 127.0.0.1 -U postgres -d aarulya_store_ci -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF has_table_privilege('aarulya_store_api', 'aarulya_store.app_versions', 'UPDATE') THEN
+              RAISE EXCEPTION 'API role must not update release records';
+            END IF;
+            IF NOT has_column_privilege('aarulya_store_publisher', 'aarulya_store.app_versions', 'status', 'UPDATE') THEN
+              RAISE EXCEPTION 'publisher role cannot publish reviewed releases';
+            END IF;
+            IF has_table_privilege('aarulya_store_downloads', 'aarulya_store.download_grants', 'SELECT') THEN
+              RAISE EXCEPTION 'downloads role must not read grant table directly';
+            END IF;
+            IF NOT has_function_privilege('aarulya_store_downloads', 'aarulya_store.consume_download_grant(uuid,text)', 'EXECUTE') THEN
+              RAISE EXCEPTION 'downloads role lacks bounded grant-consumption function';
+            END IF;
+            IF has_sequence_privilege('aarulya_store_api', 'aarulya_store.security_audit_sequence_seq', 'USAGE') THEN
+              RAISE EXCEPTION 'API role retained excessive sequence access';
+            END IF;
+          END
+          $$;
+          SQL
+
+      - name: Verify pinned backend container build
+        working-directory: aarulya-app-store
+        run: docker build --pull=false --no-cache -f backend/Dockerfile .
+
+      - name: Validate isolated production composition
+        run: |
+          mkdir -p "$RUNNER_TEMP/apk" "$RUNNER_TEMP/evidence" "$RUNNER_TEMP/secrets"
+          for secret in migrator api publisher downloads worker hmac; do
+            printf 'ci-only-placeholder-%s-00000000000000000000000000000000' "$secret" > "$RUNNER_TEMP/secrets/$secret"
+          done
+          AARULYA_STORE_BACKEND_IMAGE='example.invalid/aarulya/store@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
+          AARULYA_CADDY_IMAGE='example.invalid/aarulya/caddy@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' \
+          AARULYA_MIGRATOR_DATABASE_URL_SECRET_FILE="$RUNNER_TEMP/secrets/migrator" \
+          AARULYA_API_DATABASE_URL_SECRET_FILE="$RUNNER_TEMP/secrets/api" \
+          AARULYA_PUBLISHER_DATABASE_URL_SECRET_FILE="$RUNNER_TEMP/secrets/publisher" \
+          AARULYA_DOWNLOADS_DATABASE_URL_SECRET_FILE="$RUNNER_TEMP/secrets/downloads" \
+          AARULYA_WORKER_DATABASE_URL_SECRET_FILE="$RUNNER_TEMP/secrets/worker" \
+          AARULYA_DOWNLOAD_TOKEN_HMAC_KEY_SECRET_FILE="$RUNNER_TEMP/secrets/hmac" \
+          AARULYA_APK_ARTIFACT_ROOT="$RUNNER_TEMP/apk" \
+          AARULYA_EVIDENCE_ARTIFACT_ROOT="$RUNNER_TEMP/evidence" \
+          AARULYA_SOURCE_COMMIT_SHA="${GITHUB_SHA}" \
+          AARULYA_WORKER_ID='aarulya-ci-worker-0001' \
+          docker compose -f aarulya-app-store/deploy/compose.production.yml config --quiet
+
+  android-build-and-apk-verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+
+      - name: Verify Gradle wrapper and locked metadata
+        working-directory: aarulya-app-store/android-store
+        run: |
+          test -x gradlew
+          test -f gradle/wrapper/gradle-wrapper.jar
+          test -f gradle/wrapper/gradle-wrapper.properties
+          test -f gradle/verification-metadata.xml
+          test -f app/gradle.lockfile
+          echo '497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7  gradle/wrapper/gradle-wrapper.jar' | sha256sum -c -
+          grep -F 'distributionSha256Sum=553c78f50dafcd54d65b9a444649057857469edf836431389695608536d6b746' gradle/wrapper/gradle-wrapper.properties
+
+      - name: Install Android SDK requirements
+        run: sdkmanager 'platforms;android-37' 'build-tools;36.0.0'
+
+      - name: Build linted APKs using disposable CI-only signing
+        working-directory: aarulya-app-store/android-store
+        env:
+          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.jks
+          AARULYA_ANDROID_SIGNING_STORE_PASSWORD: ci-test-store-password
+          AARULYA_ANDROID_SIGNING_KEY_ALIAS: aarulya-store-ci-test
+          AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-key-password
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore "$AARULYA_ANDROID_SIGNING_STORE_FILE" \
+            -storepass "$AARULYA_ANDROID_SIGNING_STORE_PASSWORD" \
+            -alias "$AARULYA_ANDROID_SIGNING_KEY_ALIAS" \
+            -keypass "$AARULYA_ANDROID_SIGNING_KEY_PASSWORD" \
+            -keyalg RSA -keysize 3072 -validity 2 \
+            -dname 'CN=Aarulya Store CI Test, O=Aarulya CI, C=IN'
+          CI_TRUST_ROOT="$(printf 'aarulya-store-ci-test-release-root' | sha256sum | cut -d' ' -f1)"
+          ./gradlew --no-daemon \
+            -PaarulyaReleaseKeyFingerprints="$CI_TRUST_ROOT" \
+            :app:lintRelease :app:assembleDebug :app:assembleRelease
+
+      - name: Verify release APK identity and signature schemes
+        working-directory: aarulya-app-store/android-store
+        run: |
+          APK='app/build/outputs/apk/release/app-release.apk'
+          test -f "$APK"
+          test "$(apkanalyzer manifest application-id "$APK")" = 'com.aarulya.store'
+          test "$(apkanalyzer manifest debuggable "$APK")" = 'false'
+          apksigner verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/apksigner.txt"
+          grep -F 'Verified using v1 scheme (JAR signing): false' "$RUNNER_TEMP/apksigner.txt"
+          grep -F 'Verified using v2 scheme (APK Signature Scheme v2): true' "$RUNNER_TEMP/apksigner.txt"
+          grep -F 'Verified using v3 scheme (APK Signature Scheme v3): true' "$RUNNER_TEMP/apksigner.txt"
+          ! grep -R 'aarulya-store://oauth' app/src/main
+          grep -R 'android:autoVerify="true"' app/src/main/AndroidManifest.xml
+          rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"
