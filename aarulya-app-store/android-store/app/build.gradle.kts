@@ -26,7 +26,11 @@ android {
         buildConfigField("String", "EVIDENCE_BASE_URL", "\"https://evidence.store.aarulya.com\"")
         buildConfigField("String", "IDENTITY_ORIGIN", "\"https://identity.aarulya.com\"")
         buildConfigField("String", "OIDC_CLIENT_ID", "\"aarulya-store-android\"")
-        buildConfigField("String", "OIDC_REDIRECT_URI", "\"aarulya-store://oauth/callback\"")
+        buildConfigField(
+            "String",
+            "OIDC_REDIRECT_URI",
+            "\"https://identity.aarulya.com/store/android/callback\""
+        )
         buildConfigField(
             "String",
             "TRUSTED_RELEASE_KEY_FINGERPRINTS",
