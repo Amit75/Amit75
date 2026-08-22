@@ -36,8 +36,6 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22.23.2'
-          cache: npm
-          cache-dependency-path: aarulya-app-store/backend/package-lock.json
 
       - name: Generate and verify npm lock
         working-directory: aarulya-app-store/backend
@@ -59,8 +57,7 @@ jobs:
           cache-read-only: false
 
       - name: Install Android SDK requirements
-        run: |
-          sdkmanager 'platforms;android-37' 'build-tools;36.0.0'
+        run: sdkmanager 'platforms;android-37' 'build-tools;36.0.0'
 
       - name: Generate verified Gradle wrapper and dependency metadata
         working-directory: aarulya-app-store/android-store
@@ -103,7 +100,7 @@ jobs:
             aarulya-app-store/android-store/gradle/wrapper/gradle-wrapper.jar \
             aarulya-app-store/android-store/gradle/wrapper/gradle-wrapper.properties \
             aarulya-app-store/android-store/gradle/verification-metadata.xml \
-            'aarulya-app-store/android-store/**/gradle.lockfile'
+            ':(glob)aarulya-app-store/android-store/**/gradle.lockfile'
           if git diff --cached --quiet; then
             echo 'Reproducibility files are already current.'
           else
