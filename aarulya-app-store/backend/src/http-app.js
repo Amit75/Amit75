@@ -86,6 +86,9 @@ function requireIdempotency(request) {
 }
 
 function requirementsFor(method, pathname) {
+  if (method === 'POST' && pathname === '/api/v1/admin/releases/publish') {
+    return { scopes: ['store:release:publish'], stepUp: true };
+  }
   if (method === 'GET' && (pathname === '/api/v1/catalog' || pathname.startsWith('/api/v1/apps/'))) return { scopes: ['store:read'] };
   if (method === 'POST' && pathname === '/api/v1/actions/resolve') return { scopes: ['store:read'] };
   if (method === 'POST' && pathname === '/api/v1/downloads/authorize') return { scopes: ['store:download'] };
@@ -100,12 +103,14 @@ export function createHttpHandler({
   authenticate,
   releaseRepository,
   releaseEnvelopeRepository,
+  publicationService,
   allowedOrigins = []
 } = {}) {
   if (!service) throw new Error('store-service-required');
   if (typeof authenticate !== 'function') throw new Error('store-authenticator-required');
   if (!releaseRepository) throw new Error('release-repository-required');
   if (!releaseEnvelopeRepository) throw new Error('release-envelope-repository-required');
+  if (!publicationService) throw new Error('publication-service-required');
   const origins = new Set(allowedOrigins);
 
   return async function handler(request, response) {
@@ -158,10 +163,26 @@ export function createHttpHandler({
         actorId: identity.actorId,
         externalSubject: identity.externalSubject || null,
         sessionId: identity.sessionId,
+        tokenId: identity.tokenId,
         deviceId: identity.deviceId,
+        roles: Object.freeze([...(identity.roles || [])]),
+        scopes: Object.freeze([...(identity.scopes || [])]),
+        stepUpVerified: identity.stepUpVerified === true,
         authorizedOwner: identity.authorizedOwner === true,
         requestId
       });
+
+      if (method === 'POST' && pathname === '/api/v1/admin/releases/publish') {
+        const body = await readJson(request);
+        const idempotencyKey = requireIdempotency(request);
+        const result = await publicationService.publish(context, {
+          appId: body.appId,
+          versionCode: body.versionCode,
+          reason: body.reason,
+          requestId: idempotencyKey
+        });
+        return writeJson(response, 201, result, requestId, acceptedOrigin);
+      }
 
       if (method === 'GET' && pathname === '/api/v1/catalog') {
         const result = await service.listCatalog({
