@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createStoreService } from './store-service.js';
+import { isExecutableJobType } from './job-types.js';
 import { canServeDownload, verifyInstallCandidate } from '../../src/store-integrity.js';
 import { canTransition, terminalState, validateJobDefinition } from '../../src/durable-jobs.js';
 
@@ -98,6 +99,13 @@ export function createPersistentStoreService({ catalog, storeRepository, jobRepo
 
     async createJob(context, input = {}) {
       requireContext(context);
+      if (context.authorizedOwner !== true) throw fail('owner-maintenance-role-required', 403);
+      if (!isExecutableJobType(input.type)) throw fail('unsupported-job-type', 422);
+      const payload = structuredClone(input.payload || {});
+      if (Object.keys(payload).some((key) => key !== 'maxRows')) throw fail('unsupported-maintenance-payload', 422);
+      if (payload.maxRows != null && (!Number.isInteger(Number(payload.maxRows)) || Number(payload.maxRows) < 1 || Number(payload.maxRows) > 1000)) {
+        throw fail('bounded-maintenance-row-count-required', 422);
+      }
       const job = {
         id: input.id || randomUUID(),
         ownerId: context.actorId,
@@ -107,11 +115,11 @@ export function createPersistentStoreService({ catalog, storeRepository, jobRepo
         maxAttempts: input.maxAttempts ?? 5,
         createdAt: new Date(now()).toISOString(),
         runAt: input.runAt || null,
-        sensitive: input.sensitive === true,
-        approvalPolicy: input.sensitive === true ? 'explicit-user-or-authorized-owner' : 'not-required',
-        payload: structuredClone(input.payload || {}),
-        payloadContainsSecrets: input.payloadContainsSecrets === true,
-        unboundedExecution: input.unboundedExecution === true,
+        sensitive: true,
+        approvalPolicy: 'explicit-user-or-authorized-owner',
+        payload,
+        payloadContainsSecrets: false,
+        unboundedExecution: false,
         attempt: 0
       };
       const validation = validateJobDefinition(job);
