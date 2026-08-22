@@ -16,10 +16,14 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'aarulya_store_worker') THEN
     CREATE ROLE aarulya_store_worker NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'aarulya_store_publisher') THEN
+    CREATE ROLE aarulya_store_publisher NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
+  END IF;
 END
 $$;
 
 ALTER ROLE aarulya_store_api NOBYPASSRLS;
 ALTER ROLE aarulya_store_downloads NOBYPASSRLS;
 ALTER ROLE aarulya_store_worker NOBYPASSRLS;
+ALTER ROLE aarulya_store_publisher NOBYPASSRLS;
 ALTER ROLE aarulya_store_migrator NOBYPASSRLS;
