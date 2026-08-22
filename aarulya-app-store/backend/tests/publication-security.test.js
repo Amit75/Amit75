@@ -3,6 +3,9 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { createPublicationService } from '../src/publication-service.js';
 
+const NOW = 1_800_000_000_000;
+const NOW_SECONDS = Math.floor(NOW / 1000);
+
 function ownerIdentity(overrides = {}) {
   return {
     actorId: '00000000-0000-4000-8000-000000000001',
@@ -13,6 +16,9 @@ function ownerIdentity(overrides = {}) {
     scopes: ['store:release:publish'],
     authorizedOwner: true,
     stepUpVerified: true,
+    authenticationTime: NOW_SECONDS - 60,
+    issuedAt: NOW_SECONDS - 30,
+    expiresAt: NOW_SECONDS + 300,
     ...overrides
   };
 }
@@ -22,6 +28,7 @@ function service() {
   return {
     calls,
     value: createPublicationService({
+      now: () => NOW,
       publicationRepository: {
         async publish(input) {
           calls.push(input);
