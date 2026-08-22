@@ -11,17 +11,26 @@ function validWorkerId(value) {
   return /^[a-z0-9][a-z0-9._:-]{7,127}$/i.test(String(value || ''));
 }
 
-export async function claimNextJob(pool, workerId, now = new Date()) {
+function validSupportedTypes(value) {
+  return Array.isArray(value)
+    && value.length > 0
+    && value.length <= 32
+    && value.every((type) => /^[a-z0-9][a-z0-9._:-]{3,127}$/i.test(String(type)));
+}
+
+export async function claimNextJob(pool, workerId, supportedTypes, now = new Date()) {
   if (!validWorkerId(workerId)) throw new Error('verified-worker-id-required');
+  if (!validSupportedTypes(supportedTypes)) throw new Error('supported-worker-job-types-required');
   const leaseToken = randomBytes(32).toString('base64url');
   const leaseDigest = sha256(leaseToken);
 
   const job = await withTransaction(pool, async (client) => {
     const result = await client.query(
       `WITH candidate AS (
-         SELECT id
-         FROM jobs
+         SELECT id, state AS prior_state
+         FROM aarulya_store.jobs
          WHERE state IN ('queued', 'retrying')
+           AND type = ANY($5::text[])
            AND (run_at IS NULL OR run_at <= $1)
            AND attempt < max_attempts
            AND (sensitive = false OR approval_state = 'approved')
@@ -29,7 +38,7 @@ export async function claimNextJob(pool, workerId, now = new Date()) {
          FOR UPDATE SKIP LOCKED
          LIMIT 1
        )
-       UPDATE jobs AS j
+       UPDATE aarulya_store.jobs AS job_row
        SET state = 'leased',
            lease_owner = $2,
            lease_token_sha256 = $3,
@@ -38,17 +47,20 @@ export async function claimNextJob(pool, workerId, now = new Date()) {
            attempt = attempt + 1,
            updated_at = $1
        FROM candidate
-       WHERE j.id = candidate.id
-       RETURNING j.*`,
-      [now, workerId, leaseDigest, LEASE_SECONDS]
+       WHERE job_row.id = candidate.id
+       RETURNING job_row.*, candidate.prior_state`,
+      [now, workerId, leaseDigest, LEASE_SECONDS, supportedTypes]
     );
 
     if (!result.rowCount) return null;
     const claimed = result.rows[0];
     await client.query(
-      `INSERT INTO job_events (job_id, event_type, from_state, to_state, metadata)
-       VALUES ($1, 'worker-leased', 'queued', 'leased', jsonb_build_object('workerId', $2, 'attempt', $3))`,
-      [claimed.id, workerId, claimed.attempt]
+      `INSERT INTO aarulya_store.job_events
+        (job_id, event_type, from_state, to_state, metadata)
+       VALUES ($1, 'worker-leased', $2::aarulya_store.durable_job_state,
+               'leased'::aarulya_store.durable_job_state,
+               jsonb_build_object('workerId', $3, 'attempt', $4))`,
+      [claimed.id, claimed.prior_state, workerId, claimed.attempt]
     );
     return claimed;
   });
@@ -60,7 +72,7 @@ export async function heartbeatLease(pool, { jobId, workerId, leaseToken, now = 
   if (!validWorkerId(workerId) || !leaseToken) throw new Error('worker-lease-credentials-required');
   return withTransaction(pool, async (client) => {
     const result = await client.query(
-      `UPDATE jobs
+      `UPDATE aarulya_store.jobs
        SET last_heartbeat_at = $1,
            lease_expires_at = $1 + make_interval(secs => $5),
            updated_at = $1
@@ -126,28 +138,45 @@ async function transitionLeasedJob(pool, {
 
   return withTransaction(pool, async (client) => {
     const result = await client.query(
-      `UPDATE jobs
-       SET state = $1::durable_job_state,
+      `WITH current_job AS (
+         SELECT id, state AS prior_state
+         FROM aarulya_store.jobs
+         WHERE id = $3
+           AND lease_owner = $4
+           AND lease_token_sha256 = $5
+           AND state = ANY($6::aarulya_store.durable_job_state[])
+           AND lease_expires_at > $2
+         FOR UPDATE
+       )
+       UPDATE aarulya_store.jobs AS job_row
+       SET state = $1::aarulya_store.durable_job_state,
            updated_at = $2,
-           completed_at = CASE WHEN $1 IN ('succeeded', 'failed') THEN $2 ELSE completed_at END,
-           lease_owner = CASE WHEN $1 IN ('leased', 'running') THEN lease_owner ELSE NULL END,
-           lease_token_sha256 = CASE WHEN $1 IN ('leased', 'running') THEN lease_token_sha256 ELSE NULL END,
-           lease_expires_at = CASE WHEN $1 IN ('leased', 'running') THEN lease_expires_at ELSE NULL END
-       WHERE id = $3
-         AND lease_owner = $4
-         AND lease_token_sha256 = $5
-         AND state = ANY($6::durable_job_state[])
-         AND lease_expires_at > $2
-       RETURNING *`,
+           run_at = CASE
+             WHEN $1 = 'retrying' THEN $2 + make_interval(
+               secs => LEAST(3600, (5 * power(2, LEAST(job_row.attempt, 10)))::integer)
+             )
+             ELSE job_row.run_at
+           END,
+           completed_at = CASE WHEN $1 IN ('succeeded', 'failed') THEN $2 ELSE job_row.completed_at END,
+           lease_owner = NULL,
+           lease_token_sha256 = NULL,
+           lease_expires_at = NULL,
+           last_heartbeat_at = NULL
+       FROM current_job
+       WHERE job_row.id = current_job.id
+       RETURNING job_row.*, current_job.prior_state`,
       [toState, now, jobId, workerId, sha256(leaseToken), fromStates]
     );
     if (!result.rowCount) throw new Error('worker-transition-denied');
+    const updated = result.rows[0];
 
     await client.query(
-      `INSERT INTO job_events (job_id, event_type, from_state, to_state, metadata)
-       VALUES ($1, $2, $3::durable_job_state, $4::durable_job_state, $5::jsonb)`,
-      [jobId, eventType, result.rows[0].state === toState ? fromStates[0] : null, toState, JSON.stringify(safeMetadata)]
+      `INSERT INTO aarulya_store.job_events
+        (job_id, event_type, from_state, to_state, metadata)
+       VALUES ($1, $2, $3::aarulya_store.durable_job_state,
+               $4::aarulya_store.durable_job_state, $5::jsonb)`,
+      [jobId, eventType, updated.prior_state, toState, JSON.stringify(safeMetadata)]
     );
-    return Object.freeze(result.rows[0]);
+    return Object.freeze(updated);
   });
 }
