@@ -36,7 +36,7 @@ test('app detail view exposes explicit data safety, permissions, security and ve
   const activity = await source('app/src/main/java/com/aarulya/store/MainActivity.kt');
 
   for (const section of ['About', 'Data safety', 'Permissions', 'Security', 'Versions']) {
-    assert.match(activity, new RegExp(`"${section}"`));
+    assert.match(activity, new RegExp(`${section}\\\\n`));
   }
   assert.match(activity, /Missing evidence blocks download/);
   assert.match(activity, /No verified public release is available/);
