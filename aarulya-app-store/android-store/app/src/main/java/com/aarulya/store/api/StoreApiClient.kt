@@ -14,11 +14,20 @@ class StoreApiClient {
     private val baseUri = Uri.parse(BuildConfig.API_BASE_URL)
     private val trustedHost = baseUri.host ?: error("api-host-required")
 
+    init {
+        require(
+            baseUri.scheme == "https" &&
+                trustedHost == "api.store.aarulya.com" &&
+                baseUri.port == -1 &&
+                baseUri.path == "/v1"
+        ) { "canonical-store-api-origin-required" }
+    }
+
     fun getCatalog(accessToken: String, query: String = "", category: String? = null): JSONObject {
         val uri = baseUri.buildUpon()
             .appendPath("catalog")
-            .appendQueryParameter("q", query)
-            .apply { category?.takeIf { it.isNotBlank() }?.let { appendQueryParameter("category", it) } }
+            .appendQueryParameter("q", query.take(256))
+            .apply { category?.takeIf { it.isNotBlank() }?.let { appendQueryParameter("category", it.take(128)) } }
             .build()
         return request("GET", uri, accessToken)
     }
@@ -41,7 +50,7 @@ class StoreApiClient {
         "POST",
         baseUri.buildUpon().appendPath("actions").appendPath("resolve").build(),
         accessToken,
-        JSONObject().put("query", query)
+        JSONObject().put("query", query.take(512))
     )
 
     fun authorizeDownload(
@@ -104,7 +113,12 @@ class StoreApiClient {
         idempotencyKey: String? = null
     ): JSONObject {
         require(accessToken.length in 32..8192) { "valid-access-token-required" }
-        require(uri.scheme == "https" && uri.host == trustedHost) { "trusted-api-origin-required" }
+        require(
+            uri.scheme == "https" &&
+                uri.host == trustedHost &&
+                uri.port == -1 &&
+                uri.path?.startsWith("/v1/") == true
+        ) { "trusted-api-origin-required" }
         val connection = (URL(uri.toString()).openConnection() as HttpURLConnection).apply {
             requestMethod = method
             connectTimeout = 10_000
@@ -113,6 +127,7 @@ class StoreApiClient {
             useCaches = false
             setRequestProperty("Accept", "application/json")
             setRequestProperty("Authorization", "Bearer $accessToken")
+            setRequestProperty("Cache-Control", "no-store")
             setRequestProperty("X-Request-Id", UUID.randomUUID().toString())
             idempotencyKey?.let { setRequestProperty("Idempotency-Key", it) }
             if (body != null) {
@@ -125,24 +140,37 @@ class StoreApiClient {
             }
         }
 
-        val status = connection.responseCode
-        if (status in 300..399) throw StoreApiException(status, "redirect-prohibited")
-        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-        val raw = stream?.use { input ->
-            val output = ByteArrayOutputStream()
-            val buffer = ByteArray(8192)
-            var total = 0
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                total += read
-                if (total > 2 * 1024 * 1024) throw StoreApiException(status, "response-too-large")
-                output.write(buffer, 0, read)
+        try {
+            val status = connection.responseCode
+            if (status in 300..399) throw StoreApiException(status, "redirect-prohibited")
+            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            val raw = stream?.use { input ->
+                val output = ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                var total = 0
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    total += read
+                    if (total > 2 * 1024 * 1024) throw StoreApiException(status, "response-too-large")
+                    output.write(buffer, 0, read)
+                }
+                output.toString(Charsets.UTF_8.name())
+            }.orEmpty()
+            val contentType = connection.contentType?.substringBefore(';')?.trim()?.lowercase()
+            if (status in 200..299 && contentType != "application/json") {
+                throw StoreApiException(status, "json-response-required")
             }
-            output.toString(Charsets.UTF_8.name())
-        }.orEmpty()
-        val json = runCatching { JSONObject(raw) }.getOrElse { JSONObject() }
-        if (status !in 200..299) throw StoreApiException(status, json.optString("error", "store-api-request-failed"))
-        return json
+            val json = runCatching { JSONObject(raw) }.getOrElse {
+                if (status in 200..299) throw StoreApiException(status, "invalid-json-response")
+                JSONObject()
+            }
+            if (status !in 200..299) {
+                throw StoreApiException(status, json.optString("error", "store-api-request-failed").take(160))
+            }
+            return json
+        } finally {
+            connection.disconnect()
+        }
     }
 }
