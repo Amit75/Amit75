@@ -17,13 +17,13 @@ const TERMINAL = new Set(['succeeded', 'failed', 'cancelled', 'dead-lettered']);
 
 export const JOB_TRANSITIONS = Object.freeze({
   queued: ['leased', 'paused', 'cancelled'],
-  scheduled: ['queued', 'paused', 'cancelled'],
+  scheduled: ['leased', 'paused', 'cancelled'],
   leased: ['running', 'queued', 'cancelled'],
   running: ['succeeded', 'retrying', 'waiting-user', 'waiting-external', 'failed', 'cancelled'],
   'waiting-user': ['queued', 'paused', 'cancelled', 'failed'],
   'waiting-external': ['queued', 'retrying', 'cancelled', 'failed'],
   paused: ['queued', 'scheduled', 'cancelled'],
-  retrying: ['queued', 'dead-lettered', 'cancelled'],
+  retrying: ['leased', 'dead-lettered', 'cancelled'],
   succeeded: [],
   failed: [],
   cancelled: [],
