@@ -82,12 +82,18 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22.23.2'
-          cache: npm
-          cache-dependency-path: aarulya-app-store/backend/package-lock.json
 
-      - name: Verify locked backend dependencies and tests
+      - name: Verify backend dependencies and tests
         working-directory: aarulya-app-store/backend
+        shell: bash
         run: |
+          set -euo pipefail
+          if git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
+            echo 'STORE_NPM_LOCK_COMMITTED=true' >> "$GITHUB_ENV"
+          else
+            echo 'STORE_NPM_LOCK_COMMITTED=false' >> "$GITHUB_ENV"
+            npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          fi
           test -f package-lock.json
           npm ci --ignore-scripts --no-audit --no-fund
           npm test
@@ -161,6 +167,17 @@ jobs:
           AARULYA_WORKER_ID='aarulya-ci-worker-0001' \
           docker compose -f aarulya-app-store/deploy/compose.production.yml config --quiet
 
+      - name: Require committed backend dependency lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$STORE_NPM_LOCK_COMMITTED" != 'true' ]]; then
+            echo 'STORE_BACKEND_RUNTIME_VERIFY=PASS'
+            echo 'STORE_COMMITTED_NPM_LOCKFILE=NO'
+            exit 1
+          fi
+          echo 'STORE_COMMITTED_NPM_LOCKFILE=PASS'
+
       - name: Reconfirm unchanged exact head
         run: |
           test "$(git rev-parse HEAD)" = "$STORE_EXPECTED_HEAD"
@@ -168,7 +185,7 @@ jobs:
 
   android-build-and-apk-verification:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: Checkout exact source head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -190,12 +207,43 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle cache
+      - name: Set up Gradle 9.5.0
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+        with:
+          gradle-version: '9.5.0'
 
-      - name: Verify Gradle wrapper and locked metadata
-        working-directory: aarulya-app-store/android-store
+      - name: Install Android SDK requirements
+        shell: bash
         run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$SDK_ROOT"
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "$SDKMANAGER" ]]; then
+            SDKMANAGER="$SDK_ROOT/cmdline-tools/bin/sdkmanager"
+          fi
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" 'platforms;android-37' 'build-tools;36.0.0'
+
+      - name: Prepare and verify Gradle reproducibility metadata
+        working-directory: aarulya-app-store/android-store
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files --error-unmatch gradlew >/dev/null 2>&1 \
+            && git ls-files --error-unmatch gradle/wrapper/gradle-wrapper.jar >/dev/null 2>&1 \
+            && git ls-files --error-unmatch gradle/wrapper/gradle-wrapper.properties >/dev/null 2>&1 \
+            && git ls-files --error-unmatch gradle/verification-metadata.xml >/dev/null 2>&1 \
+            && git ls-files --error-unmatch app/gradle.lockfile >/dev/null 2>&1; then
+            echo 'STORE_GRADLE_REPRODUCIBILITY_COMMITTED=true' >> "$GITHUB_ENV"
+          else
+            echo 'STORE_GRADLE_REPRODUCIBILITY_COMMITTED=false' >> "$GITHUB_ENV"
+            gradle wrapper \
+              --gradle-version 9.5.0 \
+              --distribution-type bin \
+              --gradle-distribution-sha256-sum 553c78f50dafcd54d65b9a444649057857469edf836431389695608536d6b746
+            ./gradlew --no-daemon :app:dependencies --write-locks --write-verification-metadata sha256
+          fi
           test -x gradlew
           test -f gradle/wrapper/gradle-wrapper.jar
           test -f gradle/wrapper/gradle-wrapper.properties
@@ -204,9 +252,6 @@ jobs:
           echo '497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7  gradle/wrapper/gradle-wrapper.jar' | sha256sum -c -
           grep -F 'distributionSha256Sum=553c78f50dafcd54d65b9a444649057857469edf836431389695608536d6b746' gradle/wrapper/gradle-wrapper.properties
 
-      - name: Install Android SDK requirements
-        run: sdkmanager 'platforms;android-37' 'build-tools;36.0.0'
-
       - name: Build linted APKs using disposable CI-only signing
         working-directory: aarulya-app-store/android-store
         env:
@@ -214,7 +259,10 @@ jobs:
           AARULYA_ANDROID_SIGNING_STORE_PASSWORD: ci-test-store-password
           AARULYA_ANDROID_SIGNING_KEY_ALIAS: aarulya-store-ci-test
           AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-key-password
+        shell: bash
         run: |
+          set -euo pipefail
+          trap 'rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"' EXIT
           keytool -genkeypair -noprompt \
             -keystore "$AARULYA_ANDROID_SIGNING_STORE_FILE" \
             -storepass "$AARULYA_ANDROID_SIGNING_STORE_PASSWORD" \
@@ -240,7 +288,8 @@ jobs:
           grep -F 'Verified using v3 scheme (APK Signature Scheme v3): true' "$RUNNER_TEMP/apksigner.txt"
           ! grep -R 'aarulya-store://oauth' app/src/main
           grep -R 'android:autoVerify="true"' app/src/main/AndroidManifest.xml
-          rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"
+          grep -F 'android:host="store.aarulya.com"' app/src/main/AndroidManifest.xml
+          grep -F 'android:path="/install"' app/src/main/AndroidManifest.xml
 
       - name: Record exact-head test APK evidence
         working-directory: aarulya-app-store/android-store
@@ -260,6 +309,7 @@ jobs:
             apkSha256: process.env.APK_SHA256,
             productionSigned: false,
             physicalDeviceVerified: false,
+            appLinkAssetAssociationVerified: false,
             published: false,
             generatedAt: new Date().toISOString(),
           };
@@ -275,6 +325,17 @@ jobs:
             aarulya-app-store/android-store/app/build/outputs/apk/release/exact-head-evidence.json
           if-no-files-found: error
           retention-days: 14
+
+      - name: Require committed Gradle reproducibility files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$STORE_GRADLE_REPRODUCIBILITY_COMMITTED" != 'true' ]]; then
+            echo 'STORE_ANDROID_BUILD_AND_APK_VERIFY=PASS'
+            echo 'STORE_COMMITTED_GRADLE_REPRODUCIBILITY=NO'
+            exit 1
+          fi
+          echo 'STORE_COMMITTED_GRADLE_REPRODUCIBILITY=PASS'
 
       - name: Reconfirm unchanged exact head
         run: |
