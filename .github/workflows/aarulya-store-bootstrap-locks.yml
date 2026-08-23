@@ -27,7 +27,7 @@ jobs:
       github.ref == 'refs/heads/agent/aarulya-app-store-foundation' &&
       !contains(github.event.head_commit.message || '', '[aarulya-lock-bootstrap]')
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Checkout exact trusted branch head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -82,24 +82,25 @@ jobs:
           test -x "$SDKMANAGER"
           "$SDKMANAGER" 'platforms;android-36' 'build-tools;36.0.0'
 
-      - name: Generate verified Gradle wrapper and dependency metadata
-        working-directory: aarulya-app-store/android-store
+      - name: Create disposable CI-only signing identity
+        env:
+          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.jks
+          AARULYA_ANDROID_SIGNING_STORE_PASSWORD: ci-test-store-password
+          AARULYA_ANDROID_SIGNING_KEY_ALIAS: aarulya-store-ci-test
+          AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-key-password
         shell: bash
         run: |
           set -euo pipefail
-          test "$(gradle --version | sed -n 's/^Gradle //p' | head -n1)" = '9.5.0'
-          gradle wrapper \
-            --gradle-version 9.5.0 \
-            --distribution-type bin \
-            --gradle-distribution-sha256-sum 553c78f50dafcd54d65b9a444649057857469edf836431389695608536d6b746
-          ./gradlew --no-daemon :app:dependencies --write-locks --write-verification-metadata sha256
-          test -x gradlew
-          test -f gradle/wrapper/gradle-wrapper.jar
-          test -f gradle/wrapper/gradle-wrapper.properties
-          test -f gradle/verification-metadata.xml
-          test -f app/gradle.lockfile
+          rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"
+          keytool -genkeypair -noprompt \
+            -keystore "$AARULYA_ANDROID_SIGNING_STORE_FILE" \
+            -storepass "$AARULYA_ANDROID_SIGNING_STORE_PASSWORD" \
+            -alias "$AARULYA_ANDROID_SIGNING_KEY_ALIAS" \
+            -keypass "$AARULYA_ANDROID_SIGNING_KEY_PASSWORD" \
+            -keyalg RSA -keysize 3072 -validity 2 \
+            -dname 'CN=Aarulya Store CI Test, O=Aarulya CI, C=IN'
 
-      - name: Build with disposable CI-only signing identity
+      - name: Generate wrapper, locks and verification metadata from real build graph
         working-directory: aarulya-app-store/android-store
         env:
           AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.jks
@@ -109,18 +110,46 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          trap 'rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"' EXIT
-          keytool -genkeypair -noprompt \
-            -keystore "$AARULYA_ANDROID_SIGNING_STORE_FILE" \
-            -storepass "$AARULYA_ANDROID_SIGNING_STORE_PASSWORD" \
-            -alias "$AARULYA_ANDROID_SIGNING_KEY_ALIAS" \
-            -keypass "$AARULYA_ANDROID_SIGNING_KEY_PASSWORD" \
-            -keyalg RSA -keysize 3072 -validity 2 \
-            -dname 'CN=Aarulya Store CI Test, O=Aarulya CI, C=IN'
+          test "$(gradle --version | sed -n 's/^Gradle //p' | head -n1)" = '9.5.0'
+          gradle --no-configuration-cache wrapper \
+            --gradle-version 9.5.0 \
+            --distribution-type bin \
+            --gradle-distribution-sha256-sum 553c78f50dafcd54d65b9a444649057857469edf836431389695608536d6b746
           CI_TRUST_ROOT="$(printf 'aarulya-store-ci-test-release-root' | sha256sum | cut -d' ' -f1)"
-          ./gradlew --no-daemon \
+          ./gradlew --no-daemon --no-configuration-cache \
+            -PaarulyaReleaseKeyFingerprints="$CI_TRUST_ROOT" \
+            :app:lintRelease :app:assembleDebug :app:assembleRelease \
+            --write-locks --write-verification-metadata sha256
+          test -x gradlew
+          test -f gradle/wrapper/gradle-wrapper.jar
+          test -f gradle/wrapper/gradle-wrapper.properties
+          test -f gradle/verification-metadata.xml
+          test -f app/gradle.lockfile
+
+      - name: Verify generated metadata with a second locked build
+        working-directory: aarulya-app-store/android-store
+        env:
+          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.jks
+          AARULYA_ANDROID_SIGNING_STORE_PASSWORD: ci-test-store-password
+          AARULYA_ANDROID_SIGNING_KEY_ALIAS: aarulya-store-ci-test
+          AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-key-password
+        shell: bash
+        run: |
+          set -euo pipefail
+          CI_TRUST_ROOT="$(printf 'aarulya-store-ci-test-release-root' | sha256sum | cut -d' ' -f1)"
+          ./gradlew --no-daemon --no-configuration-cache \
             -PaarulyaReleaseKeyFingerprints="$CI_TRUST_ROOT" \
             :app:lintRelease :app:assembleDebug :app:assembleRelease
+          APK='app/build/outputs/apk/release/app-release.apk'
+          test -f "$APK"
+          apksigner verify --verbose "$APK"
+
+      - name: Remove disposable signing identity
+        if: always()
+        env:
+          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.jks
+        shell: bash
+        run: rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"
 
       - name: Commit generated reproducibility files
         shell: bash
