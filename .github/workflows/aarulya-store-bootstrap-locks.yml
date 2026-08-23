@@ -140,6 +140,7 @@ jobs:
             echo 'Reproducibility files are already current.'
             exit 0
           fi
+          git diff --cached --check
           git fetch --no-tags origin "$STORE_BOOTSTRAP_BRANCH"
           test "$(git rev-parse "origin/$STORE_BOOTSTRAP_BRANCH")" = "$STORE_BOOTSTRAP_HEAD"
           git commit -m 'Lock Aarulya Store reproducible builds [aarulya-lock-bootstrap]'
