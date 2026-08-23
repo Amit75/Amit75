@@ -223,7 +223,7 @@ export function createStoreService({
           : current.completedAt
       });
       jobs.set(jobId, updated);
-      appendJobEvent(jobId, { type: 'job-transitioned', actorId, state: nextState, metadata: clone(metadata) });
+      appendJobEvent(jobId, { type: 'job-transition', actorId, state: nextState, metadata: clone(metadata) });
       return clone(updated);
     }
   });
