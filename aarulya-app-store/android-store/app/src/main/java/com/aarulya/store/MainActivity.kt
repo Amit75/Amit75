@@ -65,11 +65,23 @@ class MainActivity : Activity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        val callback = intent?.data
-        if (callback != null && isTrustedCallback(callback)) {
+        val incoming = intent?.data
+        val installAppId = trustedInstallAppId(incoming)
+        if (installAppId != null) {
+            sessionStore.savePendingInstall(installAppId)
+            val session = sessionStore.loadSession()
+            if (session == null) {
+                renderAccountGate("Sign in to continue the verified install.")
+            } else {
+                renderAuthenticated(session, refresh = true)
+            }
+            return
+        }
+
+        if (incoming != null && isTrustedCallback(incoming)) {
             showProgress("Verifying secure sign-in…")
             executor.execute {
-                runCatching { oidc.exchangeCallback(callback) }
+                runCatching { oidc.exchangeCallback(incoming) }
                     .onSuccess { session ->
                         sessionStore.saveSession(session)
                         onUi { renderAuthenticated(session, refresh = true) }
@@ -82,7 +94,7 @@ class MainActivity : Activity() {
             return
         }
 
-        if (callback != null && callback.getQueryParameter("code") != null) {
+        if (incoming != null && incoming.getQueryParameter("code") != null) {
             sessionStore.clear()
             renderAccountGate("Untrusted sign-in callback was blocked.")
             return
@@ -99,6 +111,14 @@ class MainActivity : Activity() {
             uri.host == expected.host &&
             uri.path == expected.path &&
             uri.port == -1
+    }
+
+    private fun trustedInstallAppId(uri: Uri?): String? {
+        if (uri == null) return null
+        if (uri.scheme != "https" || uri.host != "store.aarulya.com" || uri.port != -1) return null
+        if (uri.path != "/install" || uri.fragment != null || uri.queryParameterNames != setOf("app")) return null
+        return uri.getQueryParameter("app")
+            ?.takeIf { it.matches(Regex("^[a-z0-9][a-z0-9-]{0,79}$")) }
     }
 
     private fun renderAccountGate(message: String? = null) {
@@ -131,7 +151,10 @@ class MainActivity : Activity() {
                 catalogRepository.refresh(session)
                 receiptUploader.uploadPending(session)
             }.onSuccess {
-                onUi { setContentViewSmooth(StoreHomeView(this, ::showAppDetails).build()) }
+                onUi {
+                    setContentViewSmooth(StoreHomeView(this, ::showAppDetails).build())
+                    resumePendingInstallIfReady()
+                }
             }.onFailure { error ->
                 if (error.message?.contains("401") == true || error.message?.contains("authentication") == true) {
                     sessionStore.clear()
@@ -143,6 +166,20 @@ class MainActivity : Activity() {
                 }
             }
         }
+    }
+
+    private fun resumePendingInstallIfReady() {
+        val pending = sessionStore.consumePendingInstall() ?: return
+        val app = StoreCatalog.byId(pending.appId)
+        if (app == null) {
+            Toast.makeText(this, "The requested app is not in the authenticated catalog.", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (!app.statusLabel.equals("published", ignoreCase = true) || !app.verifiedReleaseAvailable) {
+            Toast.makeText(this, "No verified published release is available for ${app.name}.", Toast.LENGTH_LONG).show()
+            return
+        }
+        beginVerifiedInstall(app)
     }
 
     private fun showAppDetails(app: StoreApp) {
@@ -166,7 +203,7 @@ class MainActivity : Activity() {
             .setNegativeButton("Close", null)
             .setNeutralButton("Trust details") { _, _ -> showTrustDetails(app) }
 
-        if (app.statusLabel.equals("published", ignoreCase = true)) {
+        if (app.statusLabel.equals("published", ignoreCase = true) && app.verifiedReleaseAvailable) {
             builder.setPositiveButton("Install") { _, _ -> beginVerifiedInstall(app) }
         }
         builder.show()
@@ -175,6 +212,7 @@ class MainActivity : Activity() {
     private fun beginVerifiedInstall(app: StoreApp) {
         val session = sessionStore.loadSession()
         if (session == null) {
+            sessionStore.savePendingInstall(app.id)
             renderAccountGate("Sign in before installing an app.")
             return
         }
