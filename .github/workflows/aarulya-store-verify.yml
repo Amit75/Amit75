@@ -223,7 +223,7 @@ jobs:
             SDKMANAGER="$SDK_ROOT/cmdline-tools/bin/sdkmanager"
           fi
           test -x "$SDKMANAGER"
-          "$SDKMANAGER" 'platforms;android-37' 'build-tools;36.0.0'
+          "$SDKMANAGER" 'platforms;android-36' 'build-tools;36.0.0'
 
       - name: Prepare and verify Gradle reproducibility metadata
         working-directory: aarulya-app-store/android-store
@@ -290,6 +290,8 @@ jobs:
           grep -R 'android:autoVerify="true"' app/src/main/AndroidManifest.xml
           grep -F 'android:host="store.aarulya.com"' app/src/main/AndroidManifest.xml
           grep -F 'android:path="/install"' app/src/main/AndroidManifest.xml
+          grep -F 'compileSdk = 36' app/build.gradle.kts
+          grep -F 'targetSdk = 36' app/build.gradle.kts
 
       - name: Record exact-head test APK evidence
         working-directory: aarulya-app-store/android-store
@@ -305,6 +307,8 @@ jobs:
             artifactType: 'CI_TEST_SIGNED_APK',
             exactHeadSha: process.env.STORE_EXPECTED_HEAD,
             packageName: 'com.aarulya.store',
+            compileSdk: 36,
+            targetSdk: 36,
             apkPath: 'aarulya-app-store/android-store/app/build/outputs/apk/release/app-release.apk',
             apkSha256: process.env.APK_SHA256,
             productionSigned: false,
