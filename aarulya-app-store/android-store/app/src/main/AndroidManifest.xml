@@ -39,6 +39,15 @@
                     android:host="identity.aarulya.com"
                     android:pathPrefix="/store/android/callback" />
             </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="store.aarulya.com"
+                    android:path="/install" />
+            </intent-filter>
         </activity>
 
         <receiver
