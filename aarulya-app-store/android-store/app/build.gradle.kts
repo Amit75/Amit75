@@ -1,6 +1,5 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 val trustedReleaseKeyFingerprints = providers.gradleProperty("aarulyaReleaseKeyFingerprints").orElse("")
