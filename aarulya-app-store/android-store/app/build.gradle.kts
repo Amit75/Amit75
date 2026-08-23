@@ -85,6 +85,16 @@ android {
         abortOnError = true
         checkReleaseBuilds = true
         warningsAsErrors = true
+        // These three checks are version-discovery advisories, not source or
+        // security findings. The production release lane is deliberately fixed
+        // to stable API 36 and the AGP 9.3 default Gradle 9.5 until API 37 and a
+        // newer stable Gradle distribution pass owner-device compatibility and
+        // reproducibility review. Every other lint issue remains fail-closed.
+        disable += setOf(
+            "OldTargetApi",
+            "GradleDependency",
+            "AndroidGradlePluginVersion"
+        )
     }
 
     packaging {
