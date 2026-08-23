@@ -4,6 +4,7 @@ import { canServeDownload, verifyInstallCandidate } from '../../src/store-integr
 import { canTransition, terminalState, validateJobDefinition } from '../../src/durable-jobs.js';
 
 const DOWNLOAD_TTL_MS = 5 * 60 * 1000;
+const DOWNLOAD_ORIGIN = 'https://downloads.store.aarulya.com';
 const MAX_PAGE_SIZE = 100;
 
 function digest(value) {
@@ -120,7 +121,12 @@ export function createStoreService({
         consumedAt: null
       });
       downloadGrantsByDigest.set(tokenDigest, grant);
-      return Object.freeze({ token, expiresAt: grant.expiresAt, grantId: grant.grantId });
+      return Object.freeze({
+        token,
+        expiresAt: grant.expiresAt,
+        grantId: grant.grantId,
+        downloadUrl: `${DOWNLOAD_ORIGIN}/v1/grants/${grant.grantId}/apk`
+      });
     },
 
     consumeDownloadGrant(context, token) {
@@ -217,13 +223,7 @@ export function createStoreService({
           : current.completedAt
       });
       jobs.set(jobId, updated);
-      appendJobEvent(jobId, {
-        type: 'job-transition',
-        actorId,
-        from: current.state,
-        to: nextState,
-        metadata: clone(metadata)
-      });
+      appendJobEvent(jobId, { type: 'job-transitioned', actorId, state: nextState, metadata: clone(metadata) });
       return clone(updated);
     }
   });
