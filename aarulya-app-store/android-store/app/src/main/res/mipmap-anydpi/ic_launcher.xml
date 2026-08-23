@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path android:fillColor="#0F1E2E" android:pathData="M54,4 A50,50 0,1 1,53.9,4 Z" />
-    <path android:fillColor="#F5C06A" android:pathData="M27,82 L46.5,30 C48.6,24.3 51.1,21 54,21 C56.9,21 59.4,24.3 61.5,30 L81,82 L67.5,82 L62.3,67.5 L45.7,67.5 L40.5,82 Z M49.8,55.5 L58.2,55.5 L54,42 Z" />
-    <path android:fillColor="#00D4E0" android:pathData="M42,59 L66,59 L66,64 L42,64 Z" />
-</vector>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/aarulya_launcher_background" />
+    <foreground android:drawable="@drawable/ic_aarulya_mark" />
+    <monochrome android:drawable="@drawable/ic_aarulya_mark_monochrome" />
+</adaptive-icon>
