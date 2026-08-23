@@ -8,12 +8,6 @@ on:
       - 'aarulya-app-store/backend/package.json'
       - 'aarulya-app-store/android-store/**'
       - '.github/workflows/aarulya-store-bootstrap-locks.yml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'aarulya-app-store/backend/package.json'
-      - 'aarulya-app-store/android-store/**'
-      - '.github/workflows/aarulya-store-bootstrap-locks.yml'
 
 permissions:
   contents: write
@@ -22,29 +16,32 @@ concurrency:
   group: aarulya-store-reproducibility-bootstrap
   cancel-in-progress: false
 
+env:
+  STORE_BOOTSTRAP_HEAD: ${{ github.sha }}
+  STORE_BOOTSTRAP_BRANCH: agent/aarulya-app-store-foundation
+
 jobs:
   generate-and-verify-locks:
     if: >-
       github.repository == 'Amit75/Amit75' &&
-      !contains(github.event.head_commit.message || '', '[aarulya-lock-bootstrap]') &&
-      (
-        (github.event_name == 'push' && github.ref == 'refs/heads/agent/aarulya-app-store-foundation') ||
-        (
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.ref == 'agent/aarulya-app-store-foundation' &&
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          github.event.pull_request.user.login == 'Amit75'
-        )
-      )
+      github.ref == 'refs/heads/agent/aarulya-app-store-foundation' &&
+      !contains(github.event.head_commit.message || '', '[aarulya-lock-bootstrap]')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - name: Checkout exact trusted branch head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: agent/aarulya-app-store-foundation
+          ref: ${{ env.STORE_BOOTSTRAP_HEAD }}
           persist-credentials: true
           fetch-depth: 0
+
+      - name: Confirm exact clean bootstrap source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$STORE_BOOTSTRAP_HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
       - name: Set up Node 22
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -54,9 +51,11 @@ jobs:
       - name: Generate and verify npm lock
         working-directory: aarulya-app-store/backend
         run: |
+          set -euo pipefail
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           npm ci --ignore-scripts --no-audit --no-fund
           npm test
+          npm audit --omit=dev --audit-level=high
 
       - name: Set up Java 17
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
@@ -71,16 +70,34 @@ jobs:
           cache-read-only: false
 
       - name: Install Android SDK requirements
-        run: sdkmanager 'platforms;android-37' 'build-tools;36.0.0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$SDK_ROOT"
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "$SDKMANAGER" ]]; then
+            SDKMANAGER="$SDK_ROOT/cmdline-tools/bin/sdkmanager"
+          fi
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" 'platforms;android-37' 'build-tools;36.0.0'
 
       - name: Generate verified Gradle wrapper and dependency metadata
         working-directory: aarulya-app-store/android-store
+        shell: bash
         run: |
+          set -euo pipefail
+          test "$(gradle --version | sed -n 's/^Gradle //p' | head -n1)" = '9.5.0'
           gradle wrapper \
             --gradle-version 9.5.0 \
             --distribution-type bin \
             --gradle-distribution-sha256-sum 553c78f50dafcd54d65b9a444649057857469edf836431389695608536d6b746
           ./gradlew --no-daemon :app:dependencies --write-locks --write-verification-metadata sha256
+          test -x gradlew
+          test -f gradle/wrapper/gradle-wrapper.jar
+          test -f gradle/wrapper/gradle-wrapper.properties
+          test -f gradle/verification-metadata.xml
+          test -f app/gradle.lockfile
 
       - name: Build with disposable CI-only signing identity
         working-directory: aarulya-app-store/android-store
@@ -89,7 +106,10 @@ jobs:
           AARULYA_ANDROID_SIGNING_STORE_PASSWORD: ci-test-store-password
           AARULYA_ANDROID_SIGNING_KEY_ALIAS: aarulya-store-ci-test
           AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-key-password
+        shell: bash
         run: |
+          set -euo pipefail
+          trap 'rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"' EXIT
           keytool -genkeypair -noprompt \
             -keystore "$AARULYA_ANDROID_SIGNING_STORE_FILE" \
             -storepass "$AARULYA_ANDROID_SIGNING_STORE_PASSWORD" \
@@ -101,10 +121,11 @@ jobs:
           ./gradlew --no-daemon \
             -PaarulyaReleaseKeyFingerprints="$CI_TRUST_ROOT" \
             :app:lintRelease :app:assembleDebug :app:assembleRelease
-          rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"
 
       - name: Commit generated reproducibility files
+        shell: bash
         run: |
+          set -euo pipefail
           git config user.name 'aarulya-store-lock-bot'
           git config user.email 'owner@aarulya.com'
           git add \
@@ -117,7 +138,9 @@ jobs:
             ':(glob)aarulya-app-store/android-store/**/gradle.lockfile'
           if git diff --cached --quiet; then
             echo 'Reproducibility files are already current.'
-          else
-            git commit -m 'Lock Aarulya Store reproducible builds [aarulya-lock-bootstrap]'
-            git push origin HEAD:agent/aarulya-app-store-foundation
+            exit 0
           fi
+          git fetch --no-tags origin "$STORE_BOOTSTRAP_BRANCH"
+          test "$(git rev-parse "origin/$STORE_BOOTSTRAP_BRANCH")" = "$STORE_BOOTSTRAP_HEAD"
+          git commit -m 'Lock Aarulya Store reproducible builds [aarulya-lock-bootstrap]'
+          git push origin "HEAD:$STORE_BOOTSTRAP_BRANCH"
