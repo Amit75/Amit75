@@ -26,9 +26,15 @@ data class PendingAuthorization(
     val createdAtEpochSeconds: Long
 )
 
+data class PendingInstall(
+    val appId: String,
+    val createdAtEpochSeconds: Long
+)
+
 class SecureSessionStore(context: Context) {
     private val preferences = context.getSharedPreferences("aarulya_store_secure_session", Context.MODE_PRIVATE)
     private val keyAlias = "aarulya_store_session_aes_v1"
+    private val appIdPattern = Regex("^[a-z0-9][a-z0-9-]{0,79}$")
 
     fun saveSession(session: StoreSession) {
         require(session.isUsable()) { "usable-session-required" }
@@ -73,6 +79,29 @@ class SecureSessionStore(context: Context) {
             pending.state == expectedState &&
                 pending.codeVerifier.length in 43..128 &&
                 pending.createdAtEpochSeconds > System.currentTimeMillis() / 1000L - 600
+        }
+    }
+
+    fun savePendingInstall(appId: String) {
+        require(appIdPattern.matches(appId)) { "valid-pending-install-app-id-required" }
+        writeEncrypted("pending_install", JSONObject().apply {
+            put("appId", appId)
+            put("createdAt", System.currentTimeMillis() / 1000L)
+        }.toString())
+    }
+
+    fun consumePendingInstall(): PendingInstall? {
+        val raw = readEncrypted("pending_install") ?: return null
+        preferences.edit().remove("pending_install").apply()
+        return runCatching {
+            val json = JSONObject(raw)
+            PendingInstall(
+                appId = json.getString("appId"),
+                createdAtEpochSeconds = json.getLong("createdAt")
+            )
+        }.getOrNull()?.takeIf { pending ->
+            appIdPattern.matches(pending.appId) &&
+                pending.createdAtEpochSeconds > System.currentTimeMillis() / 1000L - 1800
         }
     }
 
