@@ -5,6 +5,9 @@ RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
  && npm cache clean --force
 
 FROM node:22.23.2-bookworm-slim@sha256:d649c27dae7ba0137b3cef5dd75baa422c08dc3d9e3fc0c23dfb172dc3cc6436 AS runtime
+ARG SOURCE_SHA=unknown
+LABEL org.opencontainers.image.title="Aarulya Store Backend" \
+      org.opencontainers.image.revision="${SOURCE_SHA}"
 ENV NODE_ENV=production
 WORKDIR /app/backend
 RUN groupadd --system --gid 10001 aarulya \
