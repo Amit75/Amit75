@@ -14,9 +14,13 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
+
+env:
+  STORE_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
 
 concurrency:
-  group: aarulya-store-verify-${{ github.ref }}
+  group: aarulya-store-verify-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -38,10 +42,41 @@ jobs:
           --health-retries 10
 
     steps:
-      - name: Checkout exact source
+      - name: Checkout exact source head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ env.STORE_EXPECTED_HEAD }}
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Confirm exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$STORE_EXPECTED_HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Verify Draft PR identity
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          response=$(curl --fail --silent --show-error --max-time 20 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/$REPOSITORY/pulls/$PR_NUMBER")
+          PR_JSON="$response" EXPECTED_HEAD="$STORE_EXPECTED_HEAD" node --input-type=module <<'NODE'
+          const pr = JSON.parse(process.env.PR_JSON);
+          if (pr.number !== 2) throw new Error('expected PR #2');
+          if (pr.state !== 'open' || pr.draft !== true || pr.merged === true || pr.merged_at) throw new Error('PR must remain open, Draft and unmerged');
+          if (pr.head?.sha !== process.env.EXPECTED_HEAD || pr.head?.ref !== 'agent/aarulya-app-store-foundation') throw new Error('PR head mismatch');
+          if (pr.base?.ref !== 'main') throw new Error('PR base mismatch');
+          NODE
 
       - name: Set up Node 22
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -95,9 +130,16 @@ jobs:
           $$;
           SQL
 
-      - name: Verify pinned backend container build
+      - name: Verify source-labelled backend container build
         working-directory: aarulya-app-store
-        run: docker build --pull=false --no-cache -f backend/Dockerfile .
+        run: |
+          set -euo pipefail
+          docker build --pull=false --no-cache \
+            --build-arg "SOURCE_SHA=$STORE_EXPECTED_HEAD" \
+            --tag "aarulya-store-backend:$STORE_EXPECTED_HEAD" \
+            -f backend/Dockerfile .
+          test "$(docker image inspect "aarulya-store-backend:$STORE_EXPECTED_HEAD" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$STORE_EXPECTED_HEAD"
+          test "$(docker image inspect "aarulya-store-backend:$STORE_EXPECTED_HEAD" --format '{{.Config.User}}')" = '10001:10001'
 
       - name: Validate isolated production composition
         run: |
@@ -115,18 +157,32 @@ jobs:
           AARULYA_DOWNLOAD_TOKEN_HMAC_KEY_SECRET_FILE="$RUNNER_TEMP/secrets/hmac" \
           AARULYA_APK_ARTIFACT_ROOT="$RUNNER_TEMP/apk" \
           AARULYA_EVIDENCE_ARTIFACT_ROOT="$RUNNER_TEMP/evidence" \
-          AARULYA_SOURCE_COMMIT_SHA="${GITHUB_SHA}" \
+          AARULYA_SOURCE_COMMIT_SHA="$STORE_EXPECTED_HEAD" \
           AARULYA_WORKER_ID='aarulya-ci-worker-0001' \
           docker compose -f aarulya-app-store/deploy/compose.production.yml config --quiet
+
+      - name: Reconfirm unchanged exact head
+        run: |
+          test "$(git rev-parse HEAD)" = "$STORE_EXPECTED_HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
 
   android-build-and-apk-verification:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
-      - name: Checkout exact source
+      - name: Checkout exact source head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ env.STORE_EXPECTED_HEAD }}
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Confirm exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$STORE_EXPECTED_HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
       - name: Set up Java 17
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
@@ -185,3 +241,42 @@ jobs:
           ! grep -R 'aarulya-store://oauth' app/src/main
           grep -R 'android:autoVerify="true"' app/src/main/AndroidManifest.xml
           rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"
+
+      - name: Record exact-head test APK evidence
+        working-directory: aarulya-app-store/android-store
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK='app/build/outputs/apk/release/app-release.apk'
+          APK_SHA256="$(sha256sum "$APK" | awk '{print $1}')"
+          STORE_EXPECTED_HEAD="$STORE_EXPECTED_HEAD" APK_SHA256="$APK_SHA256" node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const evidence = {
+            schemaVersion: '1.0.0',
+            artifactType: 'CI_TEST_SIGNED_APK',
+            exactHeadSha: process.env.STORE_EXPECTED_HEAD,
+            packageName: 'com.aarulya.store',
+            apkPath: 'aarulya-app-store/android-store/app/build/outputs/apk/release/app-release.apk',
+            apkSha256: process.env.APK_SHA256,
+            productionSigned: false,
+            physicalDeviceVerified: false,
+            published: false,
+            generatedAt: new Date().toISOString(),
+          };
+          writeFileSync('app/build/outputs/apk/release/exact-head-evidence.json', `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600 });
+          NODE
+
+      - name: Upload exact-head CI test APK evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: aarulya-store-ci-test-apk-${{ env.STORE_EXPECTED_HEAD }}
+          path: |
+            aarulya-app-store/android-store/app/build/outputs/apk/release/app-release.apk
+            aarulya-app-store/android-store/app/build/outputs/apk/release/exact-head-evidence.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Reconfirm unchanged exact head
+        run: |
+          test "$(git rev-parse HEAD)" = "$STORE_EXPECTED_HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
