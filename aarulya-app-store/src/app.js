@@ -8,6 +8,8 @@ const APPS_BY_ID = new Map(ALL_APPS.map((app) => [app.id, app]));
 const CATEGORIES = Object.freeze(['All', ...new Set(ALL_APPS.map((app) => app.category))]);
 const REDUCE_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)');
 const SEARCH_DEBOUNCE_MS = 160;
+const INSTALL_APP_ID = /^[a-z0-9][a-z0-9-]{0,79}$/;
+const CANONICAL_INSTALL_URL = 'https://store.aarulya.com/install';
 let searchTimer = null;
 
 const icons = {
@@ -236,10 +238,20 @@ function openApp(appId) {
   $('#detailAge').textContent = app.age;
 
   const download = $('#downloadButton');
-  const available = app.status === 'published' && app.apkUrl;
+  const available = app.status === 'published' && INSTALL_APP_ID.test(app.id);
   download.disabled = !available;
-  download.textContent = available ? 'Verified APK डाउनलोड करें' : 'Release अभी उपलब्ध नहीं';
+  download.dataset.appId = available ? app.id : '';
+  download.textContent = available ? 'Aarulya Store app में खोलें' : 'Release अभी उपलब्ध नहीं';
   $('#appDialog').showModal();
+}
+
+function openVerifiedInstallHandoff() {
+  const button = $('#downloadButton');
+  const appId = button.dataset.appId || '';
+  if (button.disabled || !INSTALL_APP_ID.test(appId)) return;
+  const installUrl = new URL(CANONICAL_INSTALL_URL);
+  installUrl.searchParams.set('app', appId);
+  window.location.assign(installUrl.toString());
 }
 
 $('#searchInput').addEventListener('input', (event) => scheduleSearch(event.target.value));
@@ -250,6 +262,7 @@ $('#clearSearch').addEventListener('click', () => {
   $('#searchInput').focus();
 });
 $('#closeDialog').addEventListener('click', () => $('#appDialog').close());
+$('#downloadButton').addEventListener('click', openVerifiedInstallHandoff);
 $('#developerButton').addEventListener('click', () => $('#developerDialog').showModal());
 $('#closeDeveloper').addEventListener('click', () => $('#developerDialog').close());
 
