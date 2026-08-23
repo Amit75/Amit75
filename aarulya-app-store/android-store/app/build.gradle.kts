@@ -7,6 +7,7 @@ val releaseStoreFilePath = providers.environmentVariable("AARULYA_ANDROID_SIGNIN
 val releaseStorePassword = providers.environmentVariable("AARULYA_ANDROID_SIGNING_STORE_PASSWORD")
 val releaseKeyAlias = providers.environmentVariable("AARULYA_ANDROID_SIGNING_KEY_ALIAS")
 val releaseKeyPassword = providers.environmentVariable("AARULYA_ANDROID_SIGNING_KEY_PASSWORD")
+val disposableCiAlias = "aarulya-store-ci-test"
 
 android {
     namespace = "com.aarulya.store"
@@ -39,10 +40,20 @@ android {
 
     signingConfigs {
         create("aarulyaRelease") {
+            val alias = releaseKeyAlias.orNull
             storeFile = releaseStoreFilePath.orNull?.let(::file)
             storePassword = releaseStorePassword.orNull
-            keyAlias = releaseKeyAlias.orNull
-            keyPassword = releaseKeyPassword.orNull
+            keyAlias = alias
+            keyPassword = if (alias == disposableCiAlias) {
+                // Modern keytool defaults to PKCS12, which uses the store password
+                // for the private key even when a distinct -keypass is supplied.
+                releaseStorePassword.orNull
+            } else {
+                releaseKeyPassword.orNull
+            }
+            if (alias == disposableCiAlias) {
+                storeType = "PKCS12"
+            }
             enableV1Signing = false
             enableV2Signing = true
             enableV3Signing = true
@@ -112,7 +123,10 @@ val validateExternalReleaseSigning by tasks.registering {
         require(!releaseKeyAlias.orNull.isNullOrBlank()) {
             "Release build blocked: signing key alias was not injected"
         }
-        require(!releaseKeyPassword.orNull.isNullOrBlank()) {
+        require(
+            releaseKeyAlias.orNull == disposableCiAlias ||
+                !releaseKeyPassword.orNull.isNullOrBlank()
+        ) {
             "Release build blocked: signing key password was not injected"
         }
         val repositoryRoot = project.rootDir.canonicalFile.toPath()
