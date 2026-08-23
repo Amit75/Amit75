@@ -39,9 +39,10 @@ jobs:
       - name: Confirm exact clean bootstrap source
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
           test "$(git rev-parse HEAD)" = "$STORE_BOOTSTRAP_HEAD"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git diff --check
 
       - name: Set up Node 22
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -50,8 +51,9 @@ jobs:
 
       - name: Generate and verify npm lock
         working-directory: aarulya-app-store/backend
+        shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           npm ci --ignore-scripts --no-audit --no-fund
           npm test
@@ -69,30 +71,48 @@ jobs:
           gradle-version: '9.5.0'
           cache-read-only: false
 
-      - name: Install Android SDK requirements
+      - name: Provision isolated stable Android 16 SDK
         shell: bash
         run: |
-          set -euo pipefail
-          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-          test -n "$SDK_ROOT"
-          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          set -Eeuo pipefail
+          HOST_SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$HOST_SDK"
+          ISOLATED_SDK="$RUNNER_TEMP/android-sdk-36"
+          rm -rf "$ISOLATED_SDK"
+          mkdir -p "$ISOLATED_SDK/cmdline-tools" "$ISOLATED_SDK/licenses"
+          cp -a "$HOST_SDK/cmdline-tools/." "$ISOLATED_SDK/cmdline-tools/"
+          if [[ -d "$HOST_SDK/licenses" ]]; then
+            cp -a "$HOST_SDK/licenses/." "$ISOLATED_SDK/licenses/"
+          fi
+          SDKMANAGER="$ISOLATED_SDK/cmdline-tools/latest/bin/sdkmanager"
           if [[ ! -x "$SDKMANAGER" ]]; then
-            SDKMANAGER="$SDK_ROOT/cmdline-tools/bin/sdkmanager"
+            SDKMANAGER="$(find "$ISOLATED_SDK/cmdline-tools" -path '*/bin/sdkmanager' -type f -perm -u+x | head -n1)"
           fi
           test -x "$SDKMANAGER"
-          "$SDKMANAGER" 'platforms;android-36' 'build-tools;36.0.0'
+          yes | "$SDKMANAGER" --sdk_root="$ISOLATED_SDK" --licenses >/dev/null || true
+          "$SDKMANAGER" --sdk_root="$ISOLATED_SDK" \
+            'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
+          test -f "$ISOLATED_SDK/platforms/android-36/android.jar"
+          test -x "$ISOLATED_SDK/build-tools/36.0.0/apksigner"
+          test "$(find "$ISOLATED_SDK/platforms" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1
+          printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' "$ISOLATED_SDK" "$ISOLATED_SDK" >> "$GITHUB_ENV"
+          printf '%s\n%s\n%s\n' \
+            "$ISOLATED_SDK/platform-tools" \
+            "$ISOLATED_SDK/build-tools/36.0.0" \
+            "$ISOLATED_SDK/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
 
       - name: Create disposable CI-only signing identity
         env:
-          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.jks
+          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.p12
           AARULYA_ANDROID_SIGNING_STORE_PASSWORD: ci-test-store-password
           AARULYA_ANDROID_SIGNING_KEY_ALIAS: aarulya-store-ci-test
-          AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-key-password
+          AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-store-password
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
           rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"
           keytool -genkeypair -noprompt \
+            -storetype PKCS12 \
             -keystore "$AARULYA_ANDROID_SIGNING_STORE_FILE" \
             -storepass "$AARULYA_ANDROID_SIGNING_STORE_PASSWORD" \
             -alias "$AARULYA_ANDROID_SIGNING_KEY_ALIAS" \
@@ -100,16 +120,16 @@ jobs:
             -keyalg RSA -keysize 3072 -validity 2 \
             -dname 'CN=Aarulya Store CI Test, O=Aarulya CI, C=IN'
 
-      - name: Generate wrapper, locks and verification metadata from real build graph
+      - name: Generate wrapper, locks and metadata from real build graph
         working-directory: aarulya-app-store/android-store
         env:
-          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.jks
+          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.p12
           AARULYA_ANDROID_SIGNING_STORE_PASSWORD: ci-test-store-password
           AARULYA_ANDROID_SIGNING_KEY_ALIAS: aarulya-store-ci-test
-          AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-key-password
+          AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-store-password
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
           test "$(gradle --version | sed -n 's/^Gradle //p' | head -n1)" = '9.5.0'
           gradle --no-configuration-cache wrapper \
             --gradle-version 9.5.0 \
@@ -126,35 +146,48 @@ jobs:
           test -f gradle/verification-metadata.xml
           test -f app/gradle.lockfile
 
+      - name: Upload bootstrap diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: aarulya-store-bootstrap-diagnostics-${{ env.STORE_BOOTSTRAP_HEAD }}
+          path: |
+            aarulya-app-store/android-store/app/build/reports/lint-results-release.*
+            aarulya-app-store/android-store/app/build/intermediates/lint_intermediate_text_report/release/lintReportRelease/lint-results-release.txt
+            aarulya-app-store/android-store/build/reports/problems/**
+            ~/.npm/_logs/*.log
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Verify generated metadata with a second locked build
         working-directory: aarulya-app-store/android-store
         env:
-          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.jks
+          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.p12
           AARULYA_ANDROID_SIGNING_STORE_PASSWORD: ci-test-store-password
           AARULYA_ANDROID_SIGNING_KEY_ALIAS: aarulya-store-ci-test
-          AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-key-password
+          AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-store-password
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
           CI_TRUST_ROOT="$(printf 'aarulya-store-ci-test-release-root' | sha256sum | cut -d' ' -f1)"
           ./gradlew --no-daemon --no-configuration-cache \
             -PaarulyaReleaseKeyFingerprints="$CI_TRUST_ROOT" \
             :app:lintRelease :app:assembleDebug :app:assembleRelease
           APK='app/build/outputs/apk/release/app-release.apk'
           test -f "$APK"
-          apksigner verify --verbose "$APK"
+          "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" verify --verbose "$APK"
 
       - name: Remove disposable signing identity
         if: always()
         env:
-          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.jks
+          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.p12
         shell: bash
         run: rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"
 
       - name: Commit generated reproducibility files
         shell: bash
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
           git config user.name 'aarulya-store-lock-bot'
           git config user.email 'owner@aarulya.com'
           git add \
