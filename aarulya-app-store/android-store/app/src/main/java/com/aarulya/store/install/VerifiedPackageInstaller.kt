@@ -3,6 +3,7 @@ package com.aarulya.store.install
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInfo
 import android.content.pm.PackageInstaller
 import com.aarulya.store.storage.StoreStateDatabase
 import java.io.File
@@ -35,7 +36,7 @@ class VerifiedPackageInstaller(
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
             setAppPackageName(expected.packageId)
             setSize(apk.length())
-            setInstallLocation(PackageInstaller.SessionParams.INSTALL_LOCATION_AUTO)
+            setInstallLocation(PackageInfo.INSTALL_LOCATION_AUTO)
         }
         val sessionId = installer.createSession(params)
 
