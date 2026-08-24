@@ -1,7 +1,7 @@
-const CACHE_NAME = 'aarulya-play-local-v1';
+const CACHE_NAME = 'aarulya-play-local-v2';
 const APP_SHELL = [
   './', './index.html', './styles.css', './monetization.css', './phase-two-games.css',
-  './learning.html', './learning.css', './manifest.webmanifest',
+  './learning.html', './learning.css', './privacy.html', './manifest.webmanifest',
   './src/app.js', './src/battle-engine.js', './src/game-catalog.js', './src/monetization-policy.js',
   './src/phase-two-games.js', './src/platform-controls.js', './src/revenue-policy.js',
   './src/learning-games.js', './src/learning-app.js', './src/pwa.js'
