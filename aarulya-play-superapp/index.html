@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#060914">
-  <meta name="description" content="Aarulya Play — India-first original game super app">
+  <meta name="description" content="Aarulya Play — India-first original game and learning super app">
+  <link rel="manifest" href="manifest.webmanifest">
   <title>Aarulya Play — Battle Arena</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="monetization.css">
@@ -14,9 +15,10 @@
   <header class="topbar">
     <a class="brand" href="#top" aria-label="Aarulya Play home">
       <span class="brand-mark">A</span>
-      <span><strong>Aarulya Play</strong><small>40-game family platform • 10 playable foundations</small></span>
+      <span><strong>Aarulya Play</strong><small>40-game family platform • game + learning</small></span>
     </a>
     <div class="profile-strip">
+      <span data-network-status>Online</span>
       <span id="rank">Bronze</span>
       <strong><span id="coins">2,500</span> coins</strong>
     </div>
@@ -26,10 +28,11 @@
     <section class="hero">
       <div>
         <p class="eyebrow">INDIA-FIRST • ORIGINAL • MOBILE-FIRST</p>
-        <h1>एक app, 40 अलग games, common battle और progress system</h1>
-        <p class="lede">10 playable browser foundations, quick bot matches, win/loss result, XP, ranks, daily missions और child-safe non-cash virtual rewards.</p>
+        <h1>एक app, games, learning और local progress</h1>
+        <p class="lede">10 playable browser battles और 5 laptop-ready learning modules, quick bot matches, XP, ranks, daily missions और child-safe non-cash virtual rewards.</p>
         <div class="hero-actions">
           <button id="playFeatured" class="primary">Featured battle खेलें</button>
+          <a class="ghost" href="learning.html">Learning Zone खोलें</a>
           <a class="ghost" href="#catalog">सभी games देखें</a>
         </div>
       </div>
@@ -121,5 +124,6 @@
   <div id="toast" class="toast" role="status"></div>
   <script type="module" src="src/app.js"></script>
   <script type="module" src="src/platform-controls.js"></script>
+  <script type="module" src="src/pwa.js"></script>
 </body>
 </html>
