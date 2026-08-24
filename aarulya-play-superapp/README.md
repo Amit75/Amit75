@@ -1,117 +1,84 @@
 # Aarulya Play Super App
 
-Aarulya Play is an original, India-first, mobile-first family game platform. One application hosts independent games while sharing profile, progression, missions, ranks and non-cash virtual rewards.
+Aarulya Play is an original, India-first, mobile-first family game and learning platform. It runs as a static browser application on a laptop without requiring a VPS. A local Node.js server is included for module loading, PWA installation and offline caching.
 
 ## Current implementation milestone
 
-- Common battle lifecycle: ready -> active -> completed -> result
-- Shared player profile, XP, rank, virtual coins and daily mission state
 - Forty-game catalog across arcade, sports, board, puzzle, simulation, creativity and learning
-- Ten browser-playable foundations wired into the common battle shell
+- Ten browser-playable battle foundations with a shared match lifecycle
+- Five laptop-ready learning modules: Quiz Junior, Math Adventure, Word Builder, Robot Lab and School Adventure
+- Local player profile, XP, rank, virtual coins, daily mission state and learning progress
 - Child, teen and adult/parent audience-mode policy
-- Non-disruptive ad-placement rules with live ad serving disabled until a provider account is connected
-- Settled-revenue allocation and funded-campaign gates
-- Originality, asset-licensing and child-safety boundaries
+- Offline application shell and service-worker cache
 - No deposits, wagering, cash win/loss or withdrawal
+- No live advertising provider, paid provider, credential or production deployment
 
-## Playable foundations
+## Run on the owner laptop
 
-1. Aarulya Metro Dash — three-lane dodge battle
-2. Aarulya Cricket Strike — six-ball timing battle
-3. Aarulya Hill Rider — speed and balance race
-4. Aarulya Chaupar Battle — quick board race
-5. Aarulya Carrom Strike — five-shot aim battle
-6. Aarulya Block Puzzle — row and column clearing score battle
-7. Aarulya Goal Master — five-penalty football battle
-8. Aarulya Color Dash — Hindi colour reflex battle
-9. Aarulya Memory Battle — sixteen-card pair matching
-10. Aarulya Bubble Arena — connected-colour bubble scoring
+Requirements: Node.js 22 or newer.
 
-These are browser game foundations with independent rules and result flows. They are not being represented as final studio-grade releases; animation, audio, art assets, level depth and device testing remain production work.
+```bash
+cd aarulya-play-superapp
+npm run verify
+npm start
+```
 
-## Remaining production catalog
+Open `http://127.0.0.1:4173`. The game arena is at `/index.html` and the learning zone is at `/learning.html`.
 
-11. Aarulya Neon Stack
-12. Aarulya Quiz Junior
-13. Aarulya Snake Ladder Adventure
-14. Aarulya Traffic Escape
-15. Aarulya Fruit Blast
-16. Aarulya Number Merge
-17. Aarulya Basketball Shot
-18. Aarulya Treasure Tower
-19. Aarulya Pattern Recall
-20. Aarulya Mini Bike Sprint
-21. Aarulya Craft World
-22. Aarulya Obstacle Party
-23. Aarulya Pet Town
-24. Aarulya Farm Builder
-25. Aarulya Cooking Rush
-26. Aarulya Fashion Studio
-27. Aarulya Drawing Quest
-28. Aarulya Math Adventure
-29. Aarulya Hide & Seek Party
-30. Aarulya Monster Merge
-31. Aarulya Water Sort
-32. Aarulya Word Builder
-33. Aarulya Space Explorer
-34. Aarulya Robot Lab
-35. Aarulya City Driver
-36. Aarulya School Adventure
-37. Aarulya Music Beat
-38. Aarulya Home Designer
-39. Aarulya Rescue Heroes
-40. Aarulya Dino Park
+The local server binds to `127.0.0.1` by default, so it is not exposed to the public network. Use `HOST=0.0.0.0` only for deliberate testing on a trusted local network.
 
-## Monetization foundation
+## Playable battle foundations
 
-Intended revenue sources:
+1. Aarulya Metro Dash
+2. Aarulya Cricket Strike
+3. Aarulya Hill Rider
+4. Aarulya Chaupar Battle
+5. Aarulya Carrom Strike
+6. Aarulya Block Puzzle
+7. Aarulya Goal Master
+8. Aarulya Color Dash
+9. Aarulya Memory Battle
+10. Aarulya Bubble Arena
 
-- Contextual ads at natural breaks
-- Optional rewarded ads for virtual rewards
-- Subscriptions and ad-free access
-- Cosmetic themes, characters and environments
-- Sponsored non-wagering challenges
-- White-label and institutional licensing
+## Playable learning modules
 
-Current code keeps the ad provider in `not-connected` state. No live ad SDK, credentials or paid campaign is activated by this milestone.
+1. Aarulya Quiz Junior — general knowledge
+2. Aarulya Math Adventure — arithmetic and patterns
+3. Aarulya Word Builder — Hindi and English language practice
+4. Aarulya Robot Lab — directions, sequences and coding logic
+5. Aarulya School Adventure — safety, responsibility and classroom decisions
 
-### Audience rules
+Each learning module contains at least eight local questions, five-question rounds, explanations, local best scores and no external tracking.
 
-- Child: contextual level-end placement only, strict frequency cap, no cash/referral screen and no open chat
-- Teen: contextual level-end plus optional rewarded placement; non-cash rewards only
-- Adult/Parent: lobby banner, level-end and optional rewarded placement may be eligible after provider approval
-- App launch, active gameplay, forced mid-match, pause-button and error-screen ads are blocked
+## Remaining production work
 
-## Revenue-funded reward model
+- The other thirty catalog games remain planned production modules.
+- The ten battle foundations still need deeper levels, original studio-grade art/audio and real device testing.
+- Browser accessibility and performance testing remain required.
+- A signed Android release, Play Store package, backend account sync and public HTTPS deployment do not yet exist.
+- Production advertising remains disconnected until owner-controlled provider, consent, privacy and device verification are complete.
 
-Only verified, settled net revenue may be allocated:
+## Verification
 
-- 55% operations and infrastructure
-- 20% game content and development
-- 10% referral campaigns
-- 10% marketing
-- 5% reserve
+`npm run verify` checks:
 
-Cash referral campaigns remain disabled unless the campaign is adult-only, has published terms, verification/fraud controls and enough settled money in the referral bucket.
+- the forty-game catalog and phase-two starter contract;
+- five learning modules, question integrity, answer grading and non-cash/local-only boundaries;
+- required local/offline files, manifest and service-worker coverage.
 
-## Verification source
-
-`npm run verify` runs the source contract check for the forty-game catalog and the five phase-two starters. This does not replace browser, accessibility, performance or device testing.
+Source checks are not a substitute for owner-laptop browser and device verification.
 
 ## Product boundaries
 
 - Virtual coins are not money and cannot be withdrawn.
 - Child profiles must not receive cash prompts, open chat, stranger messaging or gambling-like mechanics.
+- Learning modules contain no paid provider, tracking SDK, chat or real-money function.
 - Ads must not interrupt active gameplay.
-- Remaining catalog entries are production modules, not falsely claimed as completed games.
+- Remaining catalog entries are not represented as completed games.
 
-## Copyright and originality rules
+## Copyright and originality
 
-- Do not copy another game's code, characters, maps, sound, music, logo, screenshots or exact interface.
-- Keep an asset register for every external asset with its licence and source.
-- Commission or produce original artwork and audio for final production.
-- Similar genres are allowed; copied expression and branded identity are not.
-- Sandbox, runner, board, party and simulation modules must use Aarulya-original worlds, characters, level layouts, UI and progression.
+Do not copy another game's code, characters, maps, sound, music, logo, screenshots or exact interface. Final artwork and audio must be original or have a recorded licence and source.
 
 ## Branch
 
