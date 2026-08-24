@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <meta name="description" content="Aarulya Play Learning Zone — offline-first quiz, maths, language, logic and school skills">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="learning.css">
+  <title>Aarulya Play — Learning Zone</title>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="index.html"><span class="brand-mark">A</span><span><strong>Aarulya Play</strong><small>Learning Zone</small></span></a>
+    <div class="header-actions"><span class="network" data-network-status>Online</span><a href="index.html">Game Arena</a></div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div><p class="eyebrow">PLAY • LEARN • PRACTISE</p><h1>पाँच learning games, बिना VPS के laptop पर</h1><p>Quiz, maths, language, coding logic और school-safety rounds। सभी questions local हैं और progress इसी browser में save होती है।</p></div>
+      <aside><span>Local progress</span><strong id="learningSummary">0 rounds • 0 correct answers</strong><button id="resetLearningProgress" type="button">Reset local progress</button></aside>
+    </section>
+
+    <section class="safety-note"><strong>Child-safe learning:</strong> कोई chat, cash reward, betting, withdrawal, external tracking या paid provider इस module में नहीं है।</section>
+    <section id="learningGrid" class="learning-grid" aria-label="Learning games"></section>
+  </main>
+
+  <dialog id="learningDialog" class="learning-dialog">
+    <section class="dialog-panel">
+      <header><div><p id="learningCategory" class="eyebrow">LEARNING</p><h2 id="learningTitle">Learning game</h2></div><button id="closeLearning" type="button" aria-label="Close">×</button></header>
+      <div class="round-meta"><span id="learningProgress">1 / 5</span><strong id="learningScore">0 points</strong></div>
+      <h3 id="questionText">Question</h3>
+      <div id="optionGrid" class="option-grid"></div>
+      <p id="learningFeedback" class="learning-feedback" role="status">एक उत्तर चुनें।</p>
+      <button id="nextQuestion" type="button" class="primary" hidden>Next question</button>
+    </section>
+  </dialog>
+
+  <script type="module" src="src/learning-app.js"></script>
+  <script type="module" src="src/pwa.js"></script>
+</body>
+</html>
