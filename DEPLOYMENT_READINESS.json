@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "projectId": "aarulya-store",
+  "projectName": "Aarulya Store",
+  "repository": "Amit75/Amit75",
+  "authoritativeBranch": "agent/aarulya-app-store-foundation",
+  "pullRequest": 2,
+  "owner": "Amit Kumar",
+  "status": "ANDROID_DISTRIBUTION_ACCEPTANCE_PENDING",
+  "productionDeployed": false,
+  "gates": [
+    "exact-head source identity",
+    "locked dependency install and audits",
+    "database migration and role acceptance",
+    "identity and owner publication authorization",
+    "Android build and release envelope verification",
+    "offline signing and certificate continuity",
+    "independent rebuild and malware assessment",
+    "physical-device installation and update acceptance",
+    "DNS TLS download and evidence service acceptance",
+    "backup restore monitoring and rollback",
+    "owner approval bound to exact release SHA"
+  ],
+  "handoff": {
+    "generator": "scripts/create-owner-handoff.sh",
+    "format": "checksum-bound tar.gz",
+    "containsSecrets": false,
+    "containsSigningKeys": false,
+    "centralOperation": "Authenticated catalog and aggregate release status APIs only"
+  },
+  "claimBoundary": "Aarulya Store is not production-ready and no signed public release is claimed until every gate has current exact-head evidence."
+}
