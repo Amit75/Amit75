@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "1.0.0",
+  "productId": "aarulya-store",
+  "productName": "Aarulya Store",
+  "productRole": "first-party-android-catalog-release-envelope-distribution-and-publication-receipt-system-of-record",
+  "commercialPriority": 10,
+  "aiEnabled": false,
+  "revenueModels": [
+    "first-party-app-distribution",
+    "enterprise-private-store",
+    "managed-release-service",
+    "implementation",
+    "support"
+  ],
+  "boundary": {
+    "owns": [
+      "first-party-app-catalog",
+      "signed-version-and-release-envelope-metadata",
+      "apk-download-and-install-receipts",
+      "update-check-and-safe-version-pointers",
+      "owner-gated-publication-evidence"
+    ],
+    "mustNotOwn": [
+      "third-party-apk-import-modification-or-resigning",
+      "application-feature-source-code",
+      "payment-custody-or-settlement",
+      "company-revenue-ledger",
+      "public-release-signing-private-keys"
+    ]
+  },
+  "markets": {
+    "india": { "state": "BLOCKED", "countryPack": "PARTIAL" },
+    "international": { "state": "BLOCKED", "countryPack": "MISSING" }
+  },
+  "launchFlags": {
+    "indiaCommercial": false,
+    "internationalCommercial": false,
+    "livePayments": false,
+    "liveProviders": false,
+    "publicProduction": false
+  },
+  "gates": {
+    "exactHeadCI": "MISSING",
+    "dependencyAudit": "MISSING",
+    "securityReview": "PARTIAL",
+    "stagingDeployment": "MISSING",
+    "backupRestore": "PARTIAL",
+    "rollback": "PARTIAL",
+    "privacyPack": "PARTIAL",
+    "legalTerms": "MISSING",
+    "pricingBilling": "MISSING",
+    "supportSLA": "MISSING",
+    "customerPilot": "MISSING",
+    "indiaCountryPack": "PARTIAL",
+    "internationalCountryPack": "MISSING"
+  },
+  "revenueTruth": {
+    "actualIncomeRequiresSettledEvidence": true,
+    "invoiceIsNotCash": true,
+    "contractIsNotCash": true,
+    "pipelineIsNotCash": true,
+    "estimatedRevenueIsNotCash": true
+  },
+  "dataGovernance": {
+    "dataCategories": [
+      "catalog-and-version-metadata",
+      "release-envelope-and-signature-reference-metadata",
+      "download-install-and-update-receipts",
+      "device-compatible-aggregate-telemetry",
+      "security-and-publication-evidence",
+      "support-and-audit-data"
+    ],
+    "defaultResidency": "owner-approved-region",
+    "crossBorderTransferDefault": "BLOCKED",
+    "retentionPolicyRequired": true,
+    "deletionAndExportWorkflowRequired": true
+  },
+  "aiGovernance": {
+    "disclosureRequired": true,
+    "modelIdentityEvidenceRequired": true,
+    "humanReviewRulesRequired": true,
+    "unsupportedClaimPublicationBlocked": true
+  },
+  "approval": {
+    "ownerApprovalRequired": true,
+    "legalProfessionalReviewRequiredForRegulatedMarkets": true,
+    "approvalEvidence": []
+  },
+  "distributionSafety": {
+    "firstPartyAarulyaAppsOnly": true,
+    "thirdPartyApkImportDenied": true,
+    "thirdPartyApkModificationDenied": true,
+    "thirdPartyApkResigningDenied": true,
+    "silentInstallDenied": true,
+    "androidUserConfirmationRequired": true,
+    "signingAuthorityOutsidePublicServices": true,
+    "signingMaterialOutsideRepository": true,
+    "packageVersionDigestAndCertificateContinuityRequired": true,
+    "v1SigningDisabled": true,
+    "v2AndV3SigningRequired": true,
+    "releaseEnvelopeKeyFingerprintPinningRequired": true,
+    "offlineSigningCeremony": "MISSING",
+    "androidBuild": "MISSING",
+    "physicalDeviceAcceptance": "MISSING",
+    "independentRebuild": "MISSING",
+    "malwareAndSecurityTesting": "MISSING",
+    "penetrationAndReverseEngineeringAssessment": "MISSING",
+    "keyCompromiseRecovery": "MISSING",
+    "disasterRecovery": "PARTIAL",
+    "finalSignedEvidence": "MISSING"
+  }
+}
