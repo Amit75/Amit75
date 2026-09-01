@@ -1,0 +1,188 @@
+name: aarulya-store
+
+x-backend-common: &backend-common
+  image: ${AARULYA_STORE_BACKEND_IMAGE:?immutable backend image reference with digest required}
+  restart: unless-stopped
+  user: "10001:10001"
+  read_only: true
+  cap_drop: ["ALL"]
+  security_opt:
+    - no-new-privileges:true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=64m
+  networks: [private]
+  environment: &backend-environment
+    NODE_ENV: production
+    AARULYA_ENV: production
+    HOST: 0.0.0.0
+    AARULYA_PRIVATE_CONTAINER_NETWORK: "true"
+    AARULYA_DATABASE_SSL_MODE: verify-full
+    AARULYA_OIDC_ISSUER: https://identity.aarulya.com
+    AARULYA_OIDC_AUDIENCE: aarulya-store-api
+    AARULYA_OIDC_JWKS_URI: https://identity.aarulya.com/.well-known/jwks.json
+    AARULYA_OIDC_ALGORITHMS: EdDSA,ES256,PS256,RS256
+    AARULYA_OIDC_CLOCK_TOLERANCE_SECONDS: "60"
+
+services:
+  migrate:
+    <<: *backend-common
+    restart: "no"
+    command: ["src/migrate.js"]
+    secrets: [migrator_database_url]
+    environment:
+      <<: *backend-environment
+      AARULYA_DATABASE_URL_FILE: /run/secrets/migrator_database_url
+      AARULYA_DATABASE_APP_NAME: aarulya-store-migrations
+      AARULYA_DATABASE_POOL_MAX: "1"
+
+  seed-catalog:
+    <<: *backend-common
+    restart: "no"
+    command: ["src/seed-catalog.js"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    secrets: [migrator_database_url]
+    environment:
+      <<: *backend-environment
+      AARULYA_DATABASE_URL_FILE: /run/secrets/migrator_database_url
+      AARULYA_DATABASE_APP_NAME: aarulya-store-catalog-seed
+      AARULYA_DATABASE_POOL_MAX: "1"
+      AARULYA_SOURCE_COMMIT_SHA: ${AARULYA_SOURCE_COMMIT_SHA:?exact source commit SHA required}
+
+  api:
+    <<: *backend-common
+    command: ["src/server.js"]
+    depends_on:
+      seed-catalog:
+        condition: service_completed_successfully
+    secrets:
+      - api_database_url
+      - publisher_database_url
+      - download_token_hmac_key
+    environment:
+      <<: *backend-environment
+      PORT: "8080"
+      AARULYA_PUBLIC_ORIGIN: https://api.store.aarulya.com
+      AARULYA_DATABASE_URL_FILE: /run/secrets/api_database_url
+      AARULYA_PUBLISHER_DATABASE_URL_FILE: /run/secrets/publisher_database_url
+      AARULYA_DOWNLOAD_TOKEN_HMAC_KEY_FILE: /run/secrets/download_token_hmac_key
+      AARULYA_DATABASE_APP_NAME: aarulya-store-api
+      AARULYA_DATABASE_POOL_MAX: "10"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>{if(!r.ok)process.exit(1)})"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  worker:
+    <<: *backend-common
+    command: ["src/worker.js"]
+    depends_on:
+      seed-catalog:
+        condition: service_completed_successfully
+    secrets: [worker_database_url]
+    environment:
+      <<: *backend-environment
+      AARULYA_DATABASE_URL_FILE: /run/secrets/worker_database_url
+      AARULYA_DATABASE_APP_NAME: aarulya-store-worker
+      AARULYA_DATABASE_POOL_MAX: "5"
+      AARULYA_WORKER_ID: ${AARULYA_WORKER_ID:?unique verified worker ID required}
+
+  downloads:
+    <<: *backend-common
+    command: ["src/artifact-server.js"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    secrets: [downloads_database_url]
+    environment:
+      <<: *backend-environment
+      PORT: "8081"
+      AARULYA_ARTIFACT_MODE: downloads
+      AARULYA_PUBLIC_ORIGIN: https://downloads.store.aarulya.com
+      AARULYA_ARTIFACT_ROOT: /srv/artifacts
+      AARULYA_DATABASE_URL_FILE: /run/secrets/downloads_database_url
+      AARULYA_DATABASE_APP_NAME: aarulya-store-downloads
+      AARULYA_DATABASE_POOL_MAX: "5"
+    volumes:
+      - ${AARULYA_APK_ARTIFACT_ROOT:?private APK artifact root required}:/srv/artifacts:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8081/health').then(r=>{if(!r.ok)process.exit(1)})"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  evidence:
+    <<: *backend-common
+    command: ["src/artifact-server.js"]
+    environment:
+      <<: *backend-environment
+      PORT: "8082"
+      AARULYA_ARTIFACT_MODE: evidence
+      AARULYA_PUBLIC_ORIGIN: https://evidence.store.aarulya.com
+      AARULYA_ARTIFACT_ROOT: /srv/artifacts
+    volumes:
+      - ${AARULYA_EVIDENCE_ARTIFACT_ROOT:?immutable evidence artifact root required}:/srv/artifacts:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8082/health').then(r=>{if(!r.ok)process.exit(1)})"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  edge:
+    image: ${AARULYA_CADDY_IMAGE:?immutable Caddy image reference with digest required}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: ["ALL"]
+    cap_add: ["NET_BIND_SERVICE"]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m
+    ports:
+      - "80:80"
+      - "443:443"
+    networks: [edge, private]
+    depends_on:
+      api:
+        condition: service_healthy
+      downloads:
+        condition: service_healthy
+      evidence:
+        condition: service_healthy
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../index.html:/srv/storefront/index.html:ro
+      - ../styles.css:/srv/storefront/styles.css:ro
+      - ../polish.css:/srv/storefront/polish.css:ro
+      - ../assets:/srv/storefront/assets:ro
+      - ../src:/srv/storefront/src:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+networks:
+  edge: {}
+  private:
+    internal: true
+
+secrets:
+  migrator_database_url:
+    file: ${AARULYA_MIGRATOR_DATABASE_URL_SECRET_FILE:?migrator database URL secret file required}
+  api_database_url:
+    file: ${AARULYA_API_DATABASE_URL_SECRET_FILE:?API database URL secret file required}
+  publisher_database_url:
+    file: ${AARULYA_PUBLISHER_DATABASE_URL_SECRET_FILE:?publisher database URL secret file required}
+  downloads_database_url:
+    file: ${AARULYA_DOWNLOADS_DATABASE_URL_SECRET_FILE:?downloads database URL secret file required}
+  worker_database_url:
+    file: ${AARULYA_WORKER_DATABASE_URL_SECRET_FILE:?worker database URL secret file required}
+  download_token_hmac_key:
+    file: ${AARULYA_DOWNLOAD_TOKEN_HMAC_KEY_SECRET_FILE:?download token HMAC key secret file required}
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}

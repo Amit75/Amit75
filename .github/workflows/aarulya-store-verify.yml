@@ -1,0 +1,433 @@
+name: Aarulya Store end-to-end source verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [agent/aarulya-app-store-foundation]
+    paths:
+      - 'aarulya-app-store/**'
+      - '.github/workflows/aarulya-store-verify.yml'
+  pull_request:
+    paths:
+      - 'aarulya-app-store/**'
+      - '.github/workflows/aarulya-store-verify.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  STORE_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+
+concurrency:
+  group: aarulya-store-verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-database-and-packaging:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:17.10-bookworm@sha256:9b18b78397054fce88a9552e9d5a3ad5bb7fd258c5b3cc1c5028e46373d6ea8f
+        env:
+          POSTGRES_PASSWORD: aarulya-ci-only-password
+          POSTGRES_DB: aarulya_store_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d aarulya_store_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.STORE_EXPECTED_HEAD }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Confirm exact source identity
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$STORE_EXPECTED_HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git diff --check
+
+      - name: Verify Draft PR identity
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          response=$(curl --fail --silent --show-error --max-time 20 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/$REPOSITORY/pulls/$PR_NUMBER")
+          PR_JSON="$response" EXPECTED_HEAD="$STORE_EXPECTED_HEAD" node --input-type=module <<'NODE'
+          const pr = JSON.parse(process.env.PR_JSON);
+          if (pr.number !== 2) throw new Error('expected PR #2');
+          if (pr.state !== 'open' || pr.draft !== true || pr.merged === true || pr.merged_at) throw new Error('PR must remain open, Draft and unmerged');
+          if (pr.head?.sha !== process.env.EXPECTED_HEAD || pr.head?.ref !== 'agent/aarulya-app-store-foundation') throw new Error('PR head mismatch');
+          if (pr.base?.ref !== 'main') throw new Error('PR base mismatch');
+          NODE
+
+      - name: Set up Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.23.2'
+
+      - name: Verify backend dependencies and tests
+        working-directory: aarulya-app-store/backend
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
+            echo 'STORE_NPM_LOCK_COMMITTED=true' >> "$GITHUB_ENV"
+          else
+            echo 'STORE_NPM_LOCK_COMMITTED=false' >> "$GITHUB_ENV"
+            npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          fi
+          test -f package-lock.json
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          npm audit --omit=dev --audit-level=high
+
+      - name: Apply every PostgreSQL migration
+        env:
+          PGPASSWORD: aarulya-ci-only-password
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          psql -h 127.0.0.1 -U postgres -d aarulya_store_ci -v ON_ERROR_STOP=1 \
+            -f aarulya-app-store/backend/bootstrap/roles.sql
+          for migration in aarulya-app-store/backend/sql/*.sql; do
+            echo "Applying $migration"
+            psql -h 127.0.0.1 -U postgres -d aarulya_store_ci -v ON_ERROR_STOP=1 -f "$migration"
+          done
+
+      - name: Verify least-privilege database boundaries
+        env:
+          PGPASSWORD: aarulya-ci-only-password
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          psql -h 127.0.0.1 -U postgres -d aarulya_store_ci -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF has_table_privilege('aarulya_store_api', 'aarulya_store.app_versions', 'UPDATE') THEN
+              RAISE EXCEPTION 'API role must not update release records';
+            END IF;
+            IF NOT has_column_privilege('aarulya_store_publisher', 'aarulya_store.app_versions', 'status', 'UPDATE') THEN
+              RAISE EXCEPTION 'publisher role cannot publish reviewed releases';
+            END IF;
+            IF has_table_privilege('aarulya_store_downloads', 'aarulya_store.download_grants', 'SELECT') THEN
+              RAISE EXCEPTION 'downloads role must not read grant table directly';
+            END IF;
+            IF NOT has_function_privilege('aarulya_store_downloads', 'aarulya_store.consume_download_grant(uuid,text)', 'EXECUTE') THEN
+              RAISE EXCEPTION 'downloads role lacks bounded grant-consumption function';
+            END IF;
+            IF has_sequence_privilege('aarulya_store_api', 'aarulya_store.security_audit_sequence_seq', 'USAGE') THEN
+              RAISE EXCEPTION 'API role retained excessive sequence access';
+            END IF;
+          END
+          $$;
+          SQL
+
+      - name: Verify source-labelled backend container build
+        working-directory: aarulya-app-store
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker build --pull=false --no-cache \
+            --build-arg "SOURCE_SHA=$STORE_EXPECTED_HEAD" \
+            --tag "aarulya-store-backend:$STORE_EXPECTED_HEAD" \
+            -f backend/Dockerfile .
+          test "$(docker image inspect "aarulya-store-backend:$STORE_EXPECTED_HEAD" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$STORE_EXPECTED_HEAD"
+          test "$(docker image inspect "aarulya-store-backend:$STORE_EXPECTED_HEAD" --format '{{.Config.User}}')" = '10001:10001'
+
+      - name: Validate isolated production composition
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$RUNNER_TEMP/apk" "$RUNNER_TEMP/evidence" "$RUNNER_TEMP/secrets"
+          for secret in migrator api publisher downloads worker hmac; do
+            printf 'ci-only-placeholder-%s-00000000000000000000000000000000' "$secret" > "$RUNNER_TEMP/secrets/$secret"
+          done
+          AARULYA_STORE_BACKEND_IMAGE='example.invalid/aarulya/store@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
+          AARULYA_CADDY_IMAGE='example.invalid/aarulya/caddy@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' \
+          AARULYA_MIGRATOR_DATABASE_URL_SECRET_FILE="$RUNNER_TEMP/secrets/migrator" \
+          AARULYA_API_DATABASE_URL_SECRET_FILE="$RUNNER_TEMP/secrets/api" \
+          AARULYA_PUBLISHER_DATABASE_URL_SECRET_FILE="$RUNNER_TEMP/secrets/publisher" \
+          AARULYA_DOWNLOADS_DATABASE_URL_SECRET_FILE="$RUNNER_TEMP/secrets/downloads" \
+          AARULYA_WORKER_DATABASE_URL_SECRET_FILE="$RUNNER_TEMP/secrets/worker" \
+          AARULYA_DOWNLOAD_TOKEN_HMAC_KEY_SECRET_FILE="$RUNNER_TEMP/secrets/hmac" \
+          AARULYA_APK_ARTIFACT_ROOT="$RUNNER_TEMP/apk" \
+          AARULYA_EVIDENCE_ARTIFACT_ROOT="$RUNNER_TEMP/evidence" \
+          AARULYA_SOURCE_COMMIT_SHA="$STORE_EXPECTED_HEAD" \
+          AARULYA_WORKER_ID='aarulya-ci-worker-0001' \
+          docker compose -f aarulya-app-store/deploy/compose.production.yml config --quiet
+
+      - name: Require committed backend dependency lock
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ "$STORE_NPM_LOCK_COMMITTED" != 'true' ]]; then
+            echo 'STORE_BACKEND_RUNTIME_VERIFY=PASS'
+            echo 'STORE_COMMITTED_NPM_LOCKFILE=NO'
+            exit 1
+          fi
+          echo 'STORE_COMMITTED_NPM_LOCKFILE=PASS'
+
+      - name: Reconfirm unchanged exact head
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$STORE_EXPECTED_HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+  android-build-and-apk-verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.STORE_EXPECTED_HEAD }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Confirm exact source identity
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$STORE_EXPECTED_HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git diff --check
+
+      - name: Set up Java 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 9.5.0
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Provision isolated stable Android 16 SDK
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          HOST_SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$HOST_SDK"
+          ISOLATED_SDK="$RUNNER_TEMP/android-sdk-36"
+          rm -rf "$ISOLATED_SDK"
+          mkdir -p "$ISOLATED_SDK/cmdline-tools" "$ISOLATED_SDK/licenses"
+          cp -a "$HOST_SDK/cmdline-tools/." "$ISOLATED_SDK/cmdline-tools/"
+          if [[ -d "$HOST_SDK/licenses" ]]; then
+            cp -a "$HOST_SDK/licenses/." "$ISOLATED_SDK/licenses/"
+          fi
+          SDKMANAGER="$ISOLATED_SDK/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "$SDKMANAGER" ]]; then
+            SDKMANAGER="$(find "$ISOLATED_SDK/cmdline-tools" -path '*/bin/sdkmanager' -type f -perm -u+x | head -n1)"
+          fi
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$ISOLATED_SDK" --licenses >/dev/null || true
+          "$SDKMANAGER" --sdk_root="$ISOLATED_SDK" \
+            'platform-tools' 'platforms;android-36' 'build-tools;36.0.0'
+          test -f "$ISOLATED_SDK/platforms/android-36/android.jar"
+          test -x "$ISOLATED_SDK/build-tools/36.0.0/apksigner"
+          test -x "$ISOLATED_SDK/cmdline-tools/latest/bin/apkanalyzer"
+          test "$(find "$ISOLATED_SDK/platforms" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1
+          printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' "$ISOLATED_SDK" "$ISOLATED_SDK" >> "$GITHUB_ENV"
+          printf '%s\n%s\n%s\n' \
+            "$ISOLATED_SDK/platform-tools" \
+            "$ISOLATED_SDK/build-tools/36.0.0" \
+            "$ISOLATED_SDK/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+
+      - name: Create disposable CI-only signing identity
+        env:
+          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.p12
+          AARULYA_ANDROID_SIGNING_STORE_PASSWORD: ci-test-store-password
+          AARULYA_ANDROID_SIGNING_KEY_ALIAS: aarulya-store-ci-test
+          AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-store-password
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"
+          keytool -genkeypair -noprompt \
+            -storetype PKCS12 \
+            -keystore "$AARULYA_ANDROID_SIGNING_STORE_FILE" \
+            -storepass "$AARULYA_ANDROID_SIGNING_STORE_PASSWORD" \
+            -alias "$AARULYA_ANDROID_SIGNING_KEY_ALIAS" \
+            -keypass "$AARULYA_ANDROID_SIGNING_KEY_PASSWORD" \
+            -keyalg RSA -keysize 3072 -validity 2 \
+            -dname 'CN=Aarulya Store CI Test, O=Aarulya CI, C=IN'
+
+      - name: Prepare and verify Gradle reproducibility metadata
+        working-directory: aarulya-app-store/android-store
+        env:
+          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.p12
+          AARULYA_ANDROID_SIGNING_STORE_PASSWORD: ci-test-store-password
+          AARULYA_ANDROID_SIGNING_KEY_ALIAS: aarulya-store-ci-test
+          AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-store-password
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          CI_TRUST_ROOT="$(printf 'aarulya-store-ci-test-release-root' | sha256sum | cut -d' ' -f1)"
+          if git ls-files --error-unmatch gradlew >/dev/null 2>&1 \
+            && git ls-files --error-unmatch gradle/wrapper/gradle-wrapper.jar >/dev/null 2>&1 \
+            && git ls-files --error-unmatch gradle/wrapper/gradle-wrapper.properties >/dev/null 2>&1 \
+            && git ls-files --error-unmatch gradle/verification-metadata.xml >/dev/null 2>&1 \
+            && git ls-files --error-unmatch app/gradle.lockfile >/dev/null 2>&1; then
+            echo 'STORE_GRADLE_REPRODUCIBILITY_COMMITTED=true' >> "$GITHUB_ENV"
+          else
+            echo 'STORE_GRADLE_REPRODUCIBILITY_COMMITTED=false' >> "$GITHUB_ENV"
+            gradle --no-configuration-cache wrapper \
+              --gradle-version 9.5.0 \
+              --distribution-type bin \
+              --gradle-distribution-sha256-sum 553c78f50dafcd54d65b9a444649057857469edf836431389695608536d6b746
+            ./gradlew --no-daemon --no-configuration-cache \
+              -PaarulyaReleaseKeyFingerprints="$CI_TRUST_ROOT" \
+              :app:lintRelease :app:assembleDebug :app:assembleRelease \
+              --write-locks --write-verification-metadata sha256
+          fi
+          test -x gradlew
+          test -f gradle/wrapper/gradle-wrapper.jar
+          test -f gradle/wrapper/gradle-wrapper.properties
+          test -f gradle/verification-metadata.xml
+          test -f app/gradle.lockfile
+          echo '497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7  gradle/wrapper/gradle-wrapper.jar' | sha256sum -c -
+          grep -F 'distributionSha256Sum=553c78f50dafcd54d65b9a444649057857469edf836431389695608536d6b746' gradle/wrapper/gradle-wrapper.properties
+
+      - name: Upload Android lint and build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: aarulya-store-android-diagnostics-${{ env.STORE_EXPECTED_HEAD }}
+          path: |
+            aarulya-app-store/android-store/app/build/reports/lint-results-release.*
+            aarulya-app-store/android-store/app/build/intermediates/lint_intermediate_text_report/release/lintReportRelease/lint-results-release.txt
+            aarulya-app-store/android-store/build/reports/problems/**
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Build linted APKs from locked metadata
+        working-directory: aarulya-app-store/android-store
+        env:
+          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.p12
+          AARULYA_ANDROID_SIGNING_STORE_PASSWORD: ci-test-store-password
+          AARULYA_ANDROID_SIGNING_KEY_ALIAS: aarulya-store-ci-test
+          AARULYA_ANDROID_SIGNING_KEY_PASSWORD: ci-test-store-password
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          CI_TRUST_ROOT="$(printf 'aarulya-store-ci-test-release-root' | sha256sum | cut -d' ' -f1)"
+          ./gradlew --no-daemon --no-configuration-cache \
+            -PaarulyaReleaseKeyFingerprints="$CI_TRUST_ROOT" \
+            :app:lintRelease :app:assembleDebug :app:assembleRelease
+
+      - name: Upload locked-build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: aarulya-store-locked-build-diagnostics-${{ env.STORE_EXPECTED_HEAD }}
+          path: |
+            aarulya-app-store/android-store/app/build/reports/lint-results-release.*
+            aarulya-app-store/android-store/app/build/intermediates/lint_intermediate_text_report/release/lintReportRelease/lint-results-release.txt
+            aarulya-app-store/android-store/build/reports/problems/**
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Remove disposable signing identity
+        if: always()
+        env:
+          AARULYA_ANDROID_SIGNING_STORE_FILE: ${{ runner.temp }}/aarulya-store-ci-test.p12
+        shell: bash
+        run: rm -f "$AARULYA_ANDROID_SIGNING_STORE_FILE"
+
+      - name: Verify release APK identity and signature schemes
+        working-directory: aarulya-app-store/android-store
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          APK='app/build/outputs/apk/release/app-release.apk'
+          APKANALYZER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/apkanalyzer"
+          APKSIGNER="$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner"
+          test -f "$APK"
+          test "$($APKANALYZER manifest application-id "$APK")" = 'com.aarulya.store'
+          test "$($APKANALYZER manifest debuggable "$APK")" = 'false'
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee "$RUNNER_TEMP/apksigner.txt"
+          grep -F 'Verified using v1 scheme (JAR signing): false' "$RUNNER_TEMP/apksigner.txt"
+          grep -F 'Verified using v2 scheme (APK Signature Scheme v2): true' "$RUNNER_TEMP/apksigner.txt"
+          grep -F 'Verified using v3 scheme (APK Signature Scheme v3): true' "$RUNNER_TEMP/apksigner.txt"
+          ! grep -R 'aarulya-store://oauth' app/src/main
+          grep -R 'android:autoVerify="true"' app/src/main/AndroidManifest.xml
+          grep -F 'android:host="store.aarulya.com"' app/src/main/AndroidManifest.xml
+          grep -F 'android:path="/install"' app/src/main/AndroidManifest.xml
+          grep -F 'compileSdk = 36' app/build.gradle.kts
+          grep -F 'targetSdk = 36' app/build.gradle.kts
+
+      - name: Record exact-head test APK evidence
+        working-directory: aarulya-app-store/android-store
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          APK='app/build/outputs/apk/release/app-release.apk'
+          APK_SHA256="$(sha256sum "$APK" | awk '{print $1}')"
+          STORE_EXPECTED_HEAD="$STORE_EXPECTED_HEAD" APK_SHA256="$APK_SHA256" node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const evidence = {
+            schemaVersion: '1.0.0',
+            artifactType: 'CI_TEST_SIGNED_APK',
+            exactHeadSha: process.env.STORE_EXPECTED_HEAD,
+            packageName: 'com.aarulya.store',
+            compileSdk: 36,
+            targetSdk: 36,
+            apkPath: 'aarulya-app-store/android-store/app/build/outputs/apk/release/app-release.apk',
+            apkSha256: process.env.APK_SHA256,
+            productionSigned: false,
+            physicalDeviceVerified: false,
+            appLinkAssetAssociationVerified: false,
+            published: false,
+            generatedAt: new Date().toISOString(),
+          };
+          writeFileSync('app/build/outputs/apk/release/exact-head-evidence.json', `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600 });
+          NODE
+
+      - name: Upload exact-head CI test APK evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: aarulya-store-ci-test-apk-${{ env.STORE_EXPECTED_HEAD }}
+          path: |
+            aarulya-app-store/android-store/app/build/outputs/apk/release/app-release.apk
+            aarulya-app-store/android-store/app/build/outputs/apk/release/exact-head-evidence.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Require committed Gradle reproducibility files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ "$STORE_GRADLE_REPRODUCIBILITY_COMMITTED" != 'true' ]]; then
+            echo 'STORE_ANDROID_BUILD_AND_APK_VERIFY=PASS'
+            echo 'STORE_COMMITTED_GRADLE_REPRODUCIBILITY=NO'
+            exit 1
+          fi
+          echo 'STORE_COMMITTED_GRADLE_REPRODUCIBILITY=PASS'
+
+      - name: Reconfirm unchanged exact head
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$STORE_EXPECTED_HEAD"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"

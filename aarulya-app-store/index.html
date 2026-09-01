@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="hi" data-store-origin="https://store.aarulya.com">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0F1E2E">
+  <meta name="description" content="Aarulya App Store — original, verified Android apps from Aarulya">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Aarulya App Store">
+  <meta property="og:description" content="Original Aarulya apps, verified before download and installation.">
+  <meta property="og:url" content="https://store.aarulya.com/">
+  <link rel="canonical" href="https://store.aarulya.com/">
+  <link rel="icon" type="image/svg+xml" href="assets/aarulya-store-mark.svg">
+  <title>Aarulya App Store</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="polish.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="Aarulya App Store home"><img class="logo" src="assets/aarulya-store-mark.svg" width="44" height="44" alt="" aria-hidden="true"><span><strong>Aarulya App Store</strong><small>Original • Verified • India-first</small></span></a>
+    <nav class="top-actions" aria-label="Store navigation">
+      <a href="#categories" class="ghost-link">Categories</a>
+      <button id="developerButton" class="ghost" type="button">Developer Portal</button>
+    </nav>
+  </header>
+
+  <main id="top" class="shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">STORE.AARULYA.COM</p>
+        <h1>एक ही Store में हर काम का सही app</h1>
+        <p>Games, books, cinema, farming, study, business, documents और छोटे daily tools—सब एक unified catalog में।</p>
+        <div class="searchbox">
+          <input id="searchInput" type="search" placeholder="App खोजें—PDF, photo, games, books, farming…" autocomplete="off" aria-label="Search Aarulya apps">
+          <button id="clearSearch" type="button" aria-label="Clear search">×</button>
+        </div>
+      </div>
+      <aside class="status-card">
+        <span>Foundation status</span>
+        <strong id="catalogCount">0 apps catalogued</strong>
+        <p>Download तभी खुलेगा जब signed APK, checksum, privacy policy और security review complete हों।</p>
+      </aside>
+    </section>
+
+    <section class="trust-strip" aria-label="Store trust rules">
+      <div><b>Signed APK</b><span>Verified owner</span></div>
+      <div><b>SHA-256</b><span>Integrity check</span></div>
+      <div><b>Security review</b><span>Malware gate</span></div>
+      <div><b>Original content</b><span>No copied apps, books or films</span></div>
+    </section>
+
+    <section id="featured" class="featured-section">
+      <div class="section-head"><div><p class="eyebrow">FEATURED</p><h2>मुख्य Aarulya apps</h2></div></div>
+      <div id="featuredGrid" class="featured-grid"></div>
+    </section>
+
+    <section id="categories" class="categories-section">
+      <div class="section-head"><div><p class="eyebrow">BROWSE</p><h2>Categories</h2></div></div>
+      <div id="categoryChips" class="chips"></div>
+    </section>
+
+    <section id="searchResultsSection" class="catalog-section" hidden>
+      <div class="section-head"><div><p class="eyebrow">SEARCH RESULTS</p><h2 id="searchTitle">Matching apps</h2></div></div>
+      <div id="searchResults" class="app-grid"></div>
+      <div id="searchEmpty" class="empty" hidden>इस search में कोई app नहीं मिला।</div>
+    </section>
+
+    <div id="shelves"></div>
+
+    <section id="allAppsSection" class="catalog-section">
+      <div class="section-head"><div><p class="eyebrow">FULL CATALOG</p><h2>सभी Aarulya apps</h2></div><span id="visibleCount" class="count-pill"></span></div>
+      <div id="appGrid" class="app-grid"></div>
+      <div id="emptyState" class="empty" hidden>इस category में अभी कोई app नहीं है।</div>
+    </section>
+
+    <section class="roadmap">
+      <div><p class="eyebrow">BUILD ORDER</p><h2>पहले useful apps, फिर बड़े platforms</h2></div>
+      <ol>
+        <li>Calculator, QR Tools, Unit Converter और Notes</li>
+        <li>Document Scanner, Image to PDF और PDF Suite</li>
+        <li>Photo Resizer, Photo Editor और Video Compressor</li>
+        <li>Aarulya Kisan, Aarulya Books और Aarulya Learning</li>
+        <li>Aarulya Play, Cinema, Business और Cloud ecosystem</li>
+      </ol>
+    </section>
+  </main>
+
+  <dialog id="appDialog" class="dialog">
+    <article class="dialog-card">
+      <header><div><p id="detailCategory" class="eyebrow"></p><h2 id="detailName"></h2></div><button id="closeDialog" class="close" type="button" aria-label="Close">×</button></header>
+      <div id="detailIcon" class="detail-icon" aria-hidden="true">A</div>
+      <p id="detailDescription"></p>
+      <dl>
+        <div><dt>Package</dt><dd id="detailPackage"></dd></div>
+        <div><dt>Status</dt><dd id="detailStatus"></dd></div>
+        <div><dt>Age</dt><dd id="detailAge"></dd></div>
+      </dl>
+      <button id="downloadButton" class="primary" type="button" disabled>Release अभी उपलब्ध नहीं</button>
+      <small>Installation केवल verified published release पर खुलेगी।</small>
+    </article>
+  </dialog>
+
+  <dialog id="developerDialog" class="dialog">
+    <article class="dialog-card">
+      <header><div><p class="eyebrow">DEVELOPER PORTAL</p><h2>Submission foundation</h2></div><button id="closeDeveloper" class="close" type="button" aria-label="Close">×</button></header>
+      <p>पहले Aarulya के first-party apps publish होंगे। बाद में approved developers signed APK, privacy policy, ownership proof और security scan के साथ submit कर सकेंगे।</p>
+      <button class="primary" type="button" disabled>External submissions अभी बंद</button>
+    </article>
+  </dialog>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

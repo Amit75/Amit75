@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.aarulya.store",
+      "sha256_cert_fingerprints": [
+        "REPLACE_WITH_PRODUCTION_AARULYA_STORE_CERTIFICATE_SHA256"
+      ]
+    }
+  }
+]

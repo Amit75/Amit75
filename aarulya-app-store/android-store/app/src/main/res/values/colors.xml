@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="aarulya_navy">#0F1E2E</color>
+    <color name="aarulya_blue">#1E6BFF</color>
+    <color name="aarulya_surface">#F8FAFC</color>
+    <color name="aarulya_white">#FFFFFF</color>
+    <color name="aarulya_launcher_background">#0F1E2E</color>
+</resources>

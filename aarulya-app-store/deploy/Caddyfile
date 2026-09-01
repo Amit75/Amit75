@@ -1,0 +1,60 @@
+{
+    email support@aarulya.com
+    admin off
+    servers {
+        protocols h1 h2 h3
+    }
+}
+
+(common_security) {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        -Server
+    }
+}
+
+store.aarulya.com {
+    import common_security
+    root * /srv/storefront
+    encode zstd gzip
+    header Content-Security-Policy "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://identity.aarulya.com; connect-src 'self' https://api.store.aarulya.com; img-src 'self' data:; style-src 'self'; script-src 'self'; upgrade-insecure-requests"
+    @immutable path /src/*
+    header @immutable Cache-Control "public, max-age=3600"
+    try_files {path} /index.html
+    file_server
+}
+
+api.store.aarulya.com {
+    import common_security
+    reverse_proxy api:8080 {
+        header_up Host {host}
+        header_up X-Forwarded-Proto https
+        header_up -X-Forwarded-Client-Cert
+    }
+}
+
+downloads.store.aarulya.com {
+    import common_security
+    request_body {
+        max_size 0
+    }
+    reverse_proxy downloads:8081 {
+        flush_interval -1
+        header_up Host {host}
+        header_up X-Forwarded-Proto https
+        header_up -X-Forwarded-Client-Cert
+    }
+}
+
+evidence.store.aarulya.com {
+    import common_security
+    reverse_proxy evidence:8082 {
+        header_up Host {host}
+        header_up X-Forwarded-Proto https
+        header_up -X-Forwarded-Client-Cert
+    }
+}

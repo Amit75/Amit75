@@ -1,0 +1,23 @@
+{
+  "name": "@aarulya/store-backend-foundation",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "start:api": "node src/server.js",
+    "start:downloads": "AARULYA_ARTIFACT_MODE=downloads node src/artifact-server.js",
+    "start:evidence": "AARULYA_ARTIFACT_MODE=evidence node src/artifact-server.js",
+    "migrate": "node src/migrate.js",
+    "seed:catalog": "node src/seed-catalog.js",
+    "worker": "node src/worker.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "jose": "6.2.9",
+    "pg": "8.23.0"
+  }
+}
