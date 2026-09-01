@@ -1,0 +1,22 @@
+name: Commercial Readiness Radar
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  commercial-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify runtime
+        run: node -e "if (Number(process.versions.node.split('.')[0]) < 20) process.exit(1)"
+      - name: Verify fail-closed commercial readiness
+        run: node scripts/verify-commercial-readiness.mjs commercial-readiness/product-readiness.v1.json
