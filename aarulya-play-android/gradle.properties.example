@@ -1,0 +1,6 @@
+# Production values belong in protected CI/release secrets, never in the repository.
+ADMOB_APP_ID=ca-app-pub-xxxxxxxxxxxxxxxx~yyyyyyyyyy
+ADMOB_BANNER_ID=ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy
+ADMOB_INTERSTITIAL_ID=ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy
+ADMOB_REWARDED_ID=ca-app-pub-xxxxxxxxxxxxxxxx/yyyyyyyyyy
+LIVE_ADS_ENABLED=true
