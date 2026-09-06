@@ -14,6 +14,9 @@ if (liveAdsEnabled) {
 def hasReleaseSigning = ['RELEASE_STORE_FILE', 'RELEASE_STORE_PASSWORD', 'RELEASE_KEY_ALIAS', 'RELEASE_KEY_PASSWORD']
         .every { project.findProperty(it)?.toString()?.trim() }
 
+def appVersionCode = (project.findProperty('VERSION_CODE') ?: '1').toString().toInteger()
+def appVersionName = (project.findProperty('VERSION_NAME') ?: '1.0.0').toString()
+
 android {
     namespace 'com.aarulya.play'
     compileSdk 35
@@ -22,8 +25,8 @@ android {
         applicationId 'com.aarulya.play'
         minSdk 23
         targetSdk 35
-        versionCode (project.findProperty('VERSION_CODE') ?: '1').toString().toInteger()
-        versionName (project.findProperty('VERSION_NAME') ?: '1.0.0').toString()
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         manifestPlaceholders = [
             admobAppId: project.findProperty('ADMOB_APP_ID') ?: 'ca-app-pub-3940256099942544~3347511713'
