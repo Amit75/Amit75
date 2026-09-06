@@ -11,10 +11,13 @@ import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
+
+import androidx.webkit.WebViewAssetLoader;
 
 import com.google.android.gms.ads.AdListener;
 import com.google.android.gms.ads.AdRequest;
@@ -32,10 +35,12 @@ import com.google.android.ump.ConsentRequestParameters;
 import com.google.android.ump.UserMessagingPlatform;
 
 public final class MainActivity extends Activity {
-    private static final String HOME_URL = "file:///android_asset/index.html";
+    private static final String APP_ASSET_HOST = "appassets.androidplatform.net";
+    private static final String HOME_URL = "https://" + APP_ASSET_HOST + "/assets/index.html";
     private static final int INTERSTITIAL_EVERY_COMPLETIONS = 3;
 
     private WebView webView;
+    private WebViewAssetLoader assetLoader;
     private AdView banner;
     private InterstitialAd interstitial;
     private RewardedAd rewarded;
@@ -49,6 +54,10 @@ public final class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         getWindow().setStatusBarColor(Color.rgb(7, 9, 20));
         getWindow().setNavigationBarColor(Color.rgb(7, 9, 20));
+
+        assetLoader = new WebViewAssetLoader.Builder()
+                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.rgb(7, 9, 20));
@@ -78,7 +87,7 @@ public final class MainActivity extends Activity {
         WebSettings settings = view.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
-        settings.setAllowFileAccess(true);
+        settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         settings.setAllowFileAccessFromFileURLs(false);
         settings.setAllowUniversalAccessFromFileURLs(false);
@@ -91,6 +100,11 @@ public final class MainActivity extends Activity {
         view.addJavascriptInterface(new NativeBridge(), "AarulyaNative");
         view.setWebViewClient(new WebViewClient() {
             @Override
+            public WebResourceResponse shouldInterceptRequest(WebView v, WebResourceRequest request) {
+                return assetLoader.shouldInterceptRequest(request.getUrl());
+            }
+
+            @Override
             public void onPageFinished(WebView v, String url) {
                 super.onPageFinished(v, url);
                 injectLifecycleObserver();
@@ -100,18 +114,16 @@ public final class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 String scheme = uri.getScheme();
-                if ("file".equalsIgnoreCase(scheme)) {
+                String host = uri.getHost();
+
+                if ("https".equalsIgnoreCase(scheme) && APP_ASSET_HOST.equalsIgnoreCase(host)) {
                     return false;
                 }
-                if ("https".equalsIgnoreCase(scheme)
-                        && uri.getHost() != null
-                        && (uri.getHost().equals("aarulya.com") || uri.getHost().endsWith(".aarulya.com"))) {
-                    return false;
-                }
+
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, uri));
                 } catch (Exception ignored) {
-                    // Fail closed: keep unknown URLs out of the embedded game surface.
+                    // Unknown or unsupported links stay outside the embedded game surface.
                 }
                 return true;
             }
@@ -122,32 +134,30 @@ public final class MainActivity extends Activity {
         String js = "(() => {" +
                 "if (window.__aarulyaNativeObserved) return;" +
                 "window.__aarulyaNativeObserved = true;" +
-                "let modalOpen = false;" +
-                "if (!document.querySelector('#nativePolicyLinks')) {" +
-                " const f=document.createElement('footer');" +
-                " f.id='nativePolicyLinks';" +
-                " f.style.cssText='padding:20px;text-align:center;font:14px sans-serif;opacity:.8';" +
-                " f.innerHTML='<a href=\"privacy.html\" style=\"color:#67e8f9;margin-right:16px\">Privacy</a><a href=\"terms.html\" style=\"color:#67e8f9\">Terms</a>';" +
-                " document.querySelector('main')?.appendChild(f);" +
-                "}" +
+                "let arenaOpen = false;" +
+                "const completed = new Set(['WIN','LOSS','DRAW']);" +
                 "const scan = () => {" +
-                " const open = !!document.querySelector('#gameModal.show');" +
-                " if (open !== modalOpen) { modalOpen = open; AarulyaNative.onGameVisibility(open); }" +
-                " const result = document.querySelector('#gameRoot .result');" +
-                " if (result && !result.dataset.nativeComplete) {" +
+                " const arena = document.querySelector('#arena');" +
+                " const open = !!arena?.open;" +
+                " if (open !== arenaOpen) { arenaOpen = open; AarulyaNative.onGameVisibility(open); }" +
+                " const timer = (document.querySelector('#timer')?.textContent || '').trim().toUpperCase();" +
+                " const result = document.querySelector('#gameStage .battle-card');" +
+                " if (open && completed.has(timer) && result && !result.dataset.nativeComplete) {" +
                 "   result.dataset.nativeComplete = '1';" +
                 "   AarulyaNative.onGameComplete();" +
-                "   if (!result.querySelector('[data-native-reward]')) {" +
+                "   const footer = document.querySelector('#arenaFooter');" +
+                "   if (footer && !footer.querySelector('[data-native-reward]')) {" +
                 "     const b = document.createElement('button');" +
-                "     b.className = 'btn secondary';" +
+                "     b.type = 'button';" +
+                "     b.className = 'action-button';" +
                 "     b.dataset.nativeReward = '1';" +
-                "     b.textContent = 'Watch ad • +50 virtual coins';" +
+                "     b.textContent = 'Optional ad • +50 virtual coins';" +
                 "     b.addEventListener('click', () => AarulyaNative.showRewardedAd());" +
-                "     result.appendChild(b);" +
+                "     footer.appendChild(b);" +
                 "   }" +
                 " }" +
                 "};" +
-                "new MutationObserver(scan).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});" +
+                "new MutationObserver(scan).observe(document.body,{subtree:true,childList:true,attributes:true,characterData:true});" +
                 "scan();" +
                 "})();";
         webView.evaluateJavascript(js, null);
@@ -273,9 +283,10 @@ public final class MainActivity extends Activity {
 
     private void grantVirtualCoins(int amount) {
         String js = "(() => {" +
-                "const s=JSON.parse(localStorage.getItem('aarulyaPlayV3')||'{}');" +
-                "s.coins=(Number(s.coins)||2500)+" + amount + ";" +
-                "localStorage.setItem('aarulyaPlayV3',JSON.stringify(s));" +
+                "const key='aarulya-play-profile-v1';" +
+                "const p=JSON.parse(localStorage.getItem(key)||'{}');" +
+                "p.virtualCoins=(Number(p.virtualCoins)||2500)+" + amount + ";" +
+                "localStorage.setItem(key,JSON.stringify(p));" +
                 "location.reload();" +
                 "})();";
         webView.evaluateJavascript(js, null);
@@ -283,9 +294,9 @@ public final class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        webView.evaluateJavascript("document.querySelector('#gameModal.show') ? 'open' : 'closed'", value -> {
+        webView.evaluateJavascript("document.querySelector('#arena')?.open ? 'open' : 'closed'", value -> {
             if ("\"open\"".equals(value)) {
-                webView.evaluateJavascript("document.querySelector('#closeGame')?.click()", null);
+                webView.evaluateJavascript("document.querySelector('#arena')?.close()", null);
             } else if (webView.canGoBack()) {
                 webView.goBack();
             } else {
