@@ -1,0 +1,55 @@
+name: Aarulya Play Android APK
+
+on:
+  push:
+    branches:
+      - agent/aarulya-play-20-game-foundation
+    paths:
+      - 'aarulya-play-v3/**'
+      - 'aarulya-play-android/**'
+      - '.github/workflows/aarulya-play-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Prepare bundled game assets
+        run: bash aarulya-play-android/copy-web-assets.sh
+
+      - name: Build installable debug APK
+        working-directory: aarulya-play-android
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Record APK digest
+        run: sha256sum aarulya-play-android/app/build/outputs/apk/debug/app-debug.apk | tee aarulya-play-android/app-debug.sha256
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aarulya-play-debug-apk-${{ github.sha }}
+          path: |
+            aarulya-play-android/app/build/outputs/apk/debug/app-debug.apk
+            aarulya-play-android/app-debug.sha256
+          if-no-files-found: error
+          retention-days: 30
