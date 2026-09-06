@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-APP_DIR="/opt/aarulya/play"
-CONTAINER="aarulya-play-static"
+APP_DIR="${AARULYA_PLAY_APP_DIR:-/opt/aarulya/play}"
+CONTAINER="${AARULYA_PLAY_CONTAINER:-aarulya-play-static}"
+PUBLIC_URL="${AARULYA_PLAY_PUBLIC_URL:-https://aarulya.com/play}"
+RELEASE_SHA="${AARULYA_PLAY_RELEASE_SHA:-}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP="/opt/aarulya/backups/aarulya-play-v3-$STAMP"
-SOURCE="https://raw.githubusercontent.com/Amit75/Amit75/710e1b12c0f6be87910619ee13b4aeb37465dfeb/aarulya-play-v3"
+
+if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "AARULYA_PLAY_RELEASE_SHA must be an exact 40-character Git commit SHA" >&2
+  exit 64
+fi
+SOURCE="https://raw.githubusercontent.com/Amit75/Amit75/$RELEASE_SHA/aarulya-play-v3"
 
 mkdir -p "$BACKUP" "$APP_DIR"
 cp -a "$APP_DIR/." "$BACKUP/" 2>/dev/null || true
@@ -20,21 +27,22 @@ rollback() {
 
 trap 'echo "Deployment failed"; rollback' ERR
 
-echo "==> Downloading Aarulya Play V3"
-for file in index.html styles.css app.js; do
+echo "==> Downloading exact Aarulya Play release $RELEASE_SHA"
+for file in index.html styles.css app.js privacy.html terms.html; do
   curl -fsSL --retry 3 --connect-timeout 15 "$SOURCE/$file" -o "$APP_DIR/$file.new"
   mv "$APP_DIR/$file.new" "$APP_DIR/$file"
 done
-chmod 0644 "$APP_DIR/index.html" "$APP_DIR/styles.css" "$APP_DIR/app.js"
+chmod 0644 "$APP_DIR"/*.html "$APP_DIR"/*.css "$APP_DIR"/*.js
 
 echo "==> Validating product files"
 grep -q '<title>Aarulya Play</title>' "$APP_DIR/index.html"
-grep -q 'अब lobby नहीं—असली playable games' "$APP_DIR/index.html"
 grep -q 'Aarulya Sky Rush' "$APP_DIR/index.html"
 grep -q 'function sky' "$APP_DIR/app.js"
 grep -q 'function goal' "$APP_DIR/app.js"
 grep -q 'function stack' "$APP_DIR/app.js"
 grep -q '.game-grid' "$APP_DIR/styles.css"
+grep -q 'Privacy Policy — Aarulya Play' "$APP_DIR/privacy.html"
+grep -q 'Terms of Use — Aarulya Play' "$APP_DIR/terms.html"
 
 echo "==> Reloading static application"
 docker inspect "$CONTAINER" >/dev/null
@@ -44,21 +52,27 @@ docker exec "$CONTAINER" nginx -s reload
 sleep 4
 
 echo "==> Verifying public build"
-HTML="$(curl -ksSL --max-time 20 "https://aarulya.com/play/?v=3-$STAMP" || true)"
-CSS_CODE="$(curl -ksS --max-time 20 -o /tmp/aarulya-v3.css -w '%{http_code}' "https://aarulya.com/play/styles.css?v=3-$STAMP" || true)"
-JS_CODE="$(curl -ksS --max-time 20 -o /tmp/aarulya-v3.js -w '%{http_code}' "https://aarulya.com/play/app.js?v=3-$STAMP" || true)"
+BASE="${PUBLIC_URL%/}"
+HTML="$(curl -fsSL --max-time 20 "$BASE/?v=3-$STAMP")"
+CSS_CODE="$(curl -fsS --max-time 20 -o /tmp/aarulya-v3.css -w '%{http_code}' "$BASE/styles.css?v=3-$STAMP")"
+JS_CODE="$(curl -fsS --max-time 20 -o /tmp/aarulya-v3.js -w '%{http_code}' "$BASE/app.js?v=3-$STAMP")"
+PRIVACY_CODE="$(curl -fsS --max-time 20 -o /tmp/aarulya-v3-privacy.html -w '%{http_code}' "$BASE/privacy.html?v=3-$STAMP")"
+TERMS_CODE="$(curl -fsS --max-time 20 -o /tmp/aarulya-v3-terms.html -w '%{http_code}' "$BASE/terms.html?v=3-$STAMP")"
 
-grep -q 'अब lobby नहीं—असली playable games' <<<"$HTML"
+grep -q 'Aarulya Sky Rush' <<<"$HTML"
 [ "$CSS_CODE" = "200" ]
 [ "$JS_CODE" = "200" ]
+[ "$PRIVACY_CODE" = "200" ]
+[ "$TERMS_CODE" = "200" ]
 grep -q '.game-grid' /tmp/aarulya-v3.css
 grep -q 'function sky' /tmp/aarulya-v3.js
+grep -q 'Privacy Policy — Aarulya Play' /tmp/aarulya-v3-privacy.html
+grep -q 'Terms of Use — Aarulya Play' /tmp/aarulya-v3-terms.html
 
 trap - ERR
-
-echo
-echo "=========================================="
-echo "LIVE: https://aarulya.com/play/?v=3-$STAMP"
+printf '\n==========================================\n'
+echo "LIVE: $BASE/?v=3-$STAMP"
+echo "RELEASE_SHA: $RELEASE_SHA"
 echo "GAMES: Sky Rush, Goal Master, Neon Stack"
 echo "BACKUP: $BACKUP"
 echo "=========================================="
