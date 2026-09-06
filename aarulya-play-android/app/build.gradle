@@ -1,0 +1,87 @@
+plugins {
+    id 'com.android.application'
+}
+
+def liveAdsEnabled = (project.findProperty('LIVE_ADS_ENABLED') ?: 'false').toString().toBoolean()
+def productionAdKeys = ['ADMOB_APP_ID', 'ADMOB_BANNER_ID', 'ADMOB_INTERSTITIAL_ID', 'ADMOB_REWARDED_ID']
+if (liveAdsEnabled) {
+    def missing = productionAdKeys.findAll { !project.findProperty(it)?.toString()?.trim() }
+    if (!missing.isEmpty()) {
+        throw new GradleException("LIVE_ADS_ENABLED=true requires production ad properties: ${missing.join(', ')}")
+    }
+}
+
+def hasReleaseSigning = ['RELEASE_STORE_FILE', 'RELEASE_STORE_PASSWORD', 'RELEASE_KEY_ALIAS', 'RELEASE_KEY_PASSWORD']
+        .every { project.findProperty(it)?.toString()?.trim() }
+
+def appVersionCode = (project.findProperty('VERSION_CODE') ?: '1').toString().toInteger()
+def appVersionName = (project.findProperty('VERSION_NAME') ?: '1.0.0').toString()
+
+android {
+    namespace 'com.aarulya.play'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.aarulya.play'
+        minSdk 23
+        targetSdk 35
+        versionCode = appVersionCode
+        versionName = appVersionName
+
+        manifestPlaceholders = [
+            admobAppId: project.findProperty('ADMOB_APP_ID') ?: 'ca-app-pub-3940256099942544~3347511713'
+        ]
+
+        buildConfigField 'String', 'ADMOB_BANNER_ID', '"' + (project.findProperty('ADMOB_BANNER_ID') ?: 'ca-app-pub-3940256099942544/9214589741') + '"'
+        buildConfigField 'String', 'ADMOB_INTERSTITIAL_ID', '"' + (project.findProperty('ADMOB_INTERSTITIAL_ID') ?: 'ca-app-pub-3940256099942544/1033173712') + '"'
+        buildConfigField 'String', 'ADMOB_REWARDED_ID', '"' + (project.findProperty('ADMOB_REWARDED_ID') ?: 'ca-app-pub-3940256099942544/5224354917') + '"'
+        buildConfigField 'boolean', 'LIVE_ADS_ENABLED', liveAdsEnabled.toString()
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(project.property('RELEASE_STORE_FILE'))
+                storePassword project.property('RELEASE_STORE_PASSWORD')
+                keyAlias project.property('RELEASE_KEY_ALIAS')
+                keyPassword project.property('RELEASE_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs = ['../web-assets']
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+        }
+        release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*']
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.14.0'
+    implementation 'com.google.android.gms:play-services-ads:25.4.0'
+    implementation 'com.google.android.ump:user-messaging-platform:4.0.0'
+}

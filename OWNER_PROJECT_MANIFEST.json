@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "projectId": "aarulya-play",
+  "projectName": "Aarulya Play",
+  "repository": "Amit75/Amit75",
+  "authoritativeBranch": "agent/aarulya-play-20-game-foundation",
+  "pullRequest": 1,
+  "pullRequestPolicy": "OPEN_DRAFT_UNMERGED",
+  "humanOwner": {"name":"Amit Kumar","githubLogin":"Amit75","role":"SOLE_HUMAN_OWNER_AND_FINAL_AUTHORITY"},
+  "createdByRecord": {"humanInitiatorAndOwner":"Amit Kumar","aiAssistance":"Game and learning software contribution under owner direction","aiOwnership":false,"aiLegalAuthority":false},
+  "provenanceRules": {"resolveLivePullRequestHead":true,"bindReportsTestsAndReleasesToExactSha":true,"ownerApprovalRequiredForProductionLaunch":true,"secretsAndPrivateProductionDataForbiddenInGit":true},
+  "laptopHandoff": {"centralRegistry":"Amit75/aarulya-sovereign-autonomous-company:ecosystem.owner-projects.json","output":"one checksum-bound tar.gz archive for this project"},
+  "readiness": {"source":"FUNCTIONAL_FOUNDATIONS_PARTIAL_CATALOG","production":"NOT_DEPLOYED","publicLaunch":"DISABLED","deploymentOnlyRemaining":false,"claimBoundary":"Remaining game modules, original assets/audio, browser/device/accessibility/performance and release acceptance remain required."}
+}

@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "1.0.0",
+  "productId": "aarulya-play",
+  "productName": "Aarulya Play",
+  "productRole": "original-games-catalog-gameplay-progression-child-safety-and-ad-placement-policy-system-of-record",
+  "commercialPriority": 11,
+  "aiEnabled": false,
+  "revenueModels": [
+    "contextual-advertising",
+    "non-cash-rewarded-placement",
+    "ad-free-entitlement",
+    "game-subscription",
+    "licensed-game-platform"
+  ],
+  "boundary": {
+    "owns": [
+      "original-game-catalog",
+      "gameplay-and-progression-records",
+      "audience-mode-and-parent-control-policy",
+      "age-aware-ad-placement-policy",
+      "game-release-and-device-acceptance-evidence"
+    ],
+    "mustNotOwn": [
+      "deposits-wagering-or-cash-stakes",
+      "cash-win-loss-or-withdrawal",
+      "payment-custody-or-settlement",
+      "company-revenue-ledger",
+      "copied-or-unlicensed-third-party-assets"
+    ]
+  },
+  "markets": {
+    "india": { "state": "BLOCKED", "countryPack": "PARTIAL" },
+    "international": { "state": "BLOCKED", "countryPack": "MISSING" }
+  },
+  "launchFlags": {
+    "indiaCommercial": false,
+    "internationalCommercial": false,
+    "livePayments": false,
+    "liveProviders": false,
+    "publicProduction": false
+  },
+  "gates": {
+    "exactHeadCI": "MISSING",
+    "dependencyAudit": "PARTIAL",
+    "securityReview": "PARTIAL",
+    "stagingDeployment": "MISSING",
+    "backupRestore": "PARTIAL",
+    "rollback": "PARTIAL",
+    "privacyPack": "PARTIAL",
+    "legalTerms": "MISSING",
+    "pricingBilling": "MISSING",
+    "supportSLA": "MISSING",
+    "customerPilot": "MISSING",
+    "indiaCountryPack": "PARTIAL",
+    "internationalCountryPack": "MISSING"
+  },
+  "revenueTruth": {
+    "actualIncomeRequiresSettledEvidence": true,
+    "invoiceIsNotCash": true,
+    "contractIsNotCash": true,
+    "pipelineIsNotCash": true,
+    "estimatedRevenueIsNotCash": true
+  },
+  "dataGovernance": {
+    "dataCategories": [
+      "account-and-audience-mode-metadata",
+      "gameplay-and-progression-data",
+      "parental-control-and-consent-records",
+      "aggregate-ad-delivery-metadata",
+      "device-performance-and-crash-evidence",
+      "support-and-audit-data"
+    ],
+    "defaultResidency": "user-or-parent-approved-region",
+    "crossBorderTransferDefault": "BLOCKED",
+    "retentionPolicyRequired": true,
+    "deletionAndExportWorkflowRequired": true
+  },
+  "aiGovernance": {
+    "disclosureRequired": true,
+    "modelIdentityEvidenceRequired": true,
+    "humanReviewRulesRequired": true,
+    "unsupportedClaimPublicationBlocked": true
+  },
+  "approval": {
+    "ownerApprovalRequired": true,
+    "legalProfessionalReviewRequiredForRegulatedMarkets": true,
+    "approvalEvidence": []
+  },
+  "gameAndChildSafety": {
+    "depositsDisabled": true,
+    "wageringDisabled": true,
+    "cashWinLossDisabled": true,
+    "withdrawalDisabled": true,
+    "appLaunchAdsDenied": true,
+    "activeGameplayAdsDenied": true,
+    "forcedMidMatchAdsDenied": true,
+    "childPlacementContextualAndLevelEndOnly": true,
+    "rewardedPlacementNonCashOnly": true,
+    "liveAdProviderDefault": "BLOCKED",
+    "childTeenAdultModesRequired": true,
+    "parentControlsRequired": true,
+    "estimatedOrUnsettledRevenueMayFundReferralCampaigns": false,
+    "originalityAndAssetLicenceEvidence": "PARTIAL",
+    "completedGameAcceptance": "PARTIAL",
+    "browserAndPhysicalDeviceAcceptance": "MISSING",
+    "accessibilityAcceptance": "MISSING",
+    "performanceAcceptance": "MISSING",
+    "originalArtAndAudioAcceptance": "MISSING",
+    "childPrivacyAndAdPolicyReview": "MISSING"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "aarulya-play-superapp",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "verify": "node tests/phase-two-contract.mjs && node tests/learning-contract.mjs && node tests/platform-contract.mjs && node tests/privacy-contract.mjs"
+  }
+}

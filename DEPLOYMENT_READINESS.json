@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "projectId": "aarulya-play",
+  "projectName": "Aarulya Play",
+  "repository": "Amit75/Amit75",
+  "authoritativeBranch": "agent/aarulya-play-20-game-foundation",
+  "pullRequest": 1,
+  "owner": "Amit Kumar",
+  "status": "PARTIAL_GAME_CATALOG_ACCEPTANCE_PENDING",
+  "productionDeployed": false,
+  "gates": [
+    "exact-head source identity",
+    "complete intended game catalog",
+    "original art and audio licence evidence",
+    "gameplay regression tests",
+    "browser and device acceptance",
+    "accessibility and performance acceptance",
+    "child teen and adult policy acceptance",
+    "safe advertising and consent acceptance",
+    "backend database backup and restore",
+    "release packaging monitoring and rollback",
+    "owner approval bound to exact release SHA"
+  ],
+  "handoff": {
+    "generator": "scripts/create-owner-handoff.sh",
+    "format": "checksum-bound tar.gz",
+    "containsSecrets": false,
+    "centralOperation": "Authenticated aggregate game and release status APIs only"
+  },
+  "claimBoundary": "Aarulya Play is not a final studio-grade or production release until every gate has current exact-head evidence."
+}

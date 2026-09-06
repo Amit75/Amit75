@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "projectId": "aarulya-play",
+  "projectName": "Aarulya Play",
+  "repository": "Amit75/Amit75",
+  "authoritativeBranch": "agent/aarulya-play-20-game-foundation",
+  "pullRequest": 1,
+  "humanOwner": {
+    "ownerId": "amit-kumar",
+    "name": "Amit Kumar",
+    "githubLogin": "Amit75",
+    "role": "SOLE_HUMAN_OWNER_AND_FINAL_AUTHORITY"
+  },
+  "controlPlane": "AARULYA_CLOUD",
+  "dataAuthority": "AARULYA",
+  "database": {
+    "name": "aarulya_play",
+    "isolation": "DEDICATED_DATABASE",
+    "ownerControlled": true,
+    "encryptionAtRest": true,
+    "rowLevelSecurityRequired": true
+  },
+  "objectStorage": {
+    "namespace": "products/aarulya-play",
+    "ownerControlled": true,
+    "encryptionAtRest": true,
+    "immutableBackupRequired": true
+  },
+  "namespaces": {
+    "queue": "products.aarulya-play",
+    "secrets": "products/aarulya-play"
+  },
+  "modelRuntime": {
+    "kind": "AARULYA_SELF_HOSTED_MODEL_GATEWAY",
+    "ownerControlled": true,
+    "externalAiEnabled": false,
+    "rawDataEgressAllowed": false,
+    "trainingUseAllowed": false
+  },
+  "integration": {
+    "directCrossProductDatabaseAccess": false,
+    "mode": "VERSIONED_AUTHENTICATED_API_OR_EVENT_ONLY"
+  },
+  "coreExternalDependencies": [
+    "DOMAIN_REGISTRATION",
+    "OWNER_PURCHASED_HARDWARE"
+  ],
+  "distribution": {
+    "store": "AARU_STORE",
+    "licenceIssuer": "AARULYA_LICENSE_AUTHORITY",
+    "packageId": "in.aarulya.play"
+  },
+  "backup": {
+    "encrypted": true,
+    "immutable": true,
+    "offlineCopy": true,
+    "ownerRestoreRequired": true
+  },
+  "externalTelemetryEnabled": false,
+  "sourceForgeTarget": "AARULYA_SOURCE_FORGE",
+  "currentState": {
+    "sourceStatus": "PARTIAL_GAME_CATALOG",
+    "remainingGates": "Remaining game modules, original art and audio, browser and device acceptance, accessibility, performance, child-safety review and Aaru Store release acceptance"
+  }
+}

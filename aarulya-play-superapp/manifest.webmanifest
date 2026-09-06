@@ -1,0 +1,12 @@
+{
+  "name": "Aarulya Play",
+  "short_name": "Aarulya Play",
+  "description": "Offline-first family games and learning activities.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#050914",
+  "theme_color": "#060914",
+  "lang": "hi-IN",
+  "categories": ["games", "education", "family"]
+}

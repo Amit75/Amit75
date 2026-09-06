@@ -1,0 +1,99 @@
+name: Aarulya Play Production Android Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: Release version name, for example 1.0.0
+        required: true
+        default: '1.0.0'
+      version_code:
+        description: Monotonically increasing Android version code
+        required: true
+        default: '1'
+
+permissions:
+  contents: read
+
+jobs:
+  signed-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Require protected production release inputs
+        env:
+          KEYSTORE_B64: ${{ secrets.AARULYA_PLAY_UPLOAD_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.AARULYA_PLAY_UPLOAD_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.AARULYA_PLAY_UPLOAD_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.AARULYA_PLAY_UPLOAD_KEY_PASSWORD }}
+          ADMOB_APP_ID: ${{ secrets.AARULYA_PLAY_ADMOB_APP_ID }}
+          ADMOB_BANNER_ID: ${{ secrets.AARULYA_PLAY_ADMOB_BANNER_ID }}
+          ADMOB_INTERSTITIAL_ID: ${{ secrets.AARULYA_PLAY_ADMOB_INTERSTITIAL_ID }}
+          ADMOB_REWARDED_ID: ${{ secrets.AARULYA_PLAY_ADMOB_REWARDED_ID }}
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_B64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD ADMOB_APP_ID ADMOB_BANNER_ID ADMOB_INTERSTITIAL_ID ADMOB_REWARDED_ID; do
+            test -n "${!name}" || { echo "Missing protected release value: $name" >&2; exit 64; }
+          done
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/aarulya-play-upload.jks"
+          chmod 600 "$RUNNER_TEMP/aarulya-play-upload.jks"
+
+      - name: Prepare bundled game assets
+        run: bash aarulya-play-android/copy-web-assets.sh
+
+      - name: Build signed release APK and AAB
+        working-directory: aarulya-play-android
+        env:
+          STORE_PASSWORD: ${{ secrets.AARULYA_PLAY_UPLOAD_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.AARULYA_PLAY_UPLOAD_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.AARULYA_PLAY_UPLOAD_KEY_PASSWORD }}
+          ADMOB_APP_ID: ${{ secrets.AARULYA_PLAY_ADMOB_APP_ID }}
+          ADMOB_BANNER_ID: ${{ secrets.AARULYA_PLAY_ADMOB_BANNER_ID }}
+          ADMOB_INTERSTITIAL_ID: ${{ secrets.AARULYA_PLAY_ADMOB_INTERSTITIAL_ID }}
+          ADMOB_REWARDED_ID: ${{ secrets.AARULYA_PLAY_ADMOB_REWARDED_ID }}
+        run: |
+          set -euo pipefail
+          gradle --no-daemon :app:assembleRelease :app:bundleRelease \
+            -PVERSION_NAME='${{ inputs.version_name }}' \
+            -PVERSION_CODE='${{ inputs.version_code }}' \
+            -PLIVE_ADS_ENABLED=true \
+            -PADMOB_APP_ID="$ADMOB_APP_ID" \
+            -PADMOB_BANNER_ID="$ADMOB_BANNER_ID" \
+            -PADMOB_INTERSTITIAL_ID="$ADMOB_INTERSTITIAL_ID" \
+            -PADMOB_REWARDED_ID="$ADMOB_REWARDED_ID" \
+            -PRELEASE_STORE_FILE="$RUNNER_TEMP/aarulya-play-upload.jks" \
+            -PRELEASE_STORE_PASSWORD="$STORE_PASSWORD" \
+            -PRELEASE_KEY_ALIAS="$KEY_ALIAS" \
+            -PRELEASE_KEY_PASSWORD="$KEY_PASSWORD"
+
+      - name: Record release digests
+        run: |
+          sha256sum aarulya-play-android/app/build/outputs/apk/release/app-release.apk | tee aarulya-play-android/release.sha256
+          sha256sum aarulya-play-android/app/build/outputs/bundle/release/app-release.aab | tee -a aarulya-play-android/release.sha256
+
+      - name: Upload signed release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aarulya-play-release-${{ inputs.version_name }}-${{ github.sha }}
+          path: |
+            aarulya-play-android/app/build/outputs/apk/release/app-release.apk
+            aarulya-play-android/app/build/outputs/bundle/release/app-release.aab
+            aarulya-play-android/release.sha256
+          if-no-files-found: error
+          retention-days: 30
