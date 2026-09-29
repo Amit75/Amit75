@@ -14,7 +14,11 @@ export function createPublicationService({
   now = () => Date.now(),
   maximumStepUpAgeSeconds = 300
 } = {}) {
-  if (!publicationRepository || typeof publicationRepository.publish !== 'function') {
+  if (
+    !publicationRepository ||
+    typeof publicationRepository.publish !== 'function' ||
+    typeof publicationRepository.selectSafeVersion !== 'function'
+  ) {
     throw new Error('publication-repository-required');
   }
   const maxAge = Math.max(60, Math.min(Number(maximumStepUpAgeSeconds) || 300, 900));
@@ -49,6 +53,39 @@ export function createPublicationService({
         versionCode: input.versionCode,
         requestId: input.requestId,
         actorSubject: identity.externalSubject,
+        reason: input.reason
+      });
+    },
+
+    async selectSafeVersion(identity, input = {}) {
+      if (!identity?.actorId || !identity.externalSubject) throw forbidden('authenticated-rollback-identity-required');
+      if (identity.authorizedOwner !== true || !Array.isArray(identity.roles) || !identity.roles.includes('owner')) {
+        throw forbidden('owner-role-required');
+      }
+      if (identity.stepUpVerified !== true) throw forbidden('owner-step-up-authentication-required');
+      if (!hasScope(identity, 'store:release:rollback')) throw forbidden('release-rollback-scope-required');
+      if (!identity.sessionId || !identity.tokenId) throw forbidden('bound-owner-session-required');
+
+      const nowSeconds = Math.floor(now() / 1000);
+      const authenticationTime = Number(identity.authenticationTime);
+      const issuedAt = Number(identity.issuedAt);
+      const expiresAt = Number(identity.expiresAt);
+      if (!Number.isFinite(authenticationTime) || authenticationTime > nowSeconds || nowSeconds - authenticationTime > maxAge) {
+        throw forbidden('recent-owner-step-up-required');
+      }
+      if (!Number.isFinite(issuedAt) || issuedAt > nowSeconds || issuedAt < authenticationTime) {
+        throw forbidden('rollback-token-binding-invalid');
+      }
+      if (!Number.isFinite(expiresAt) || expiresAt <= nowSeconds + 30) {
+        throw forbidden('rollback-token-expiring-too-soon');
+      }
+
+      return publicationRepository.selectSafeVersion({
+        appId: input.appId,
+        versionCode: input.versionCode,
+        requestId: input.requestId,
+        actorSubject: identity.externalSubject,
+        selectedBy: identity.actorId,
         reason: input.reason
       });
     }
