@@ -32,6 +32,10 @@ function service() {
         async publish(input) {
           calls.push(input);
           return { publicationReceiptId: 'receipt-0001' };
+        },
+        async selectSafeVersion(input) {
+          calls.push(input);
+          return { safeVersionReceiptId: 'safe-receipt-0001' };
         }
       }
     })
