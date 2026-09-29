@@ -77,6 +77,24 @@ test('catalog, downloads and updates follow the explicit safe-version pointer', 
   assert.equal((repository.match(/\$\{SAFE_VERSION_SELECTED\}/gu) ?? []).length, 3);
 });
 
+test('public Store bootstrap is constrained to the verified safe Store release', async () => {
+  const repository = await backend('src/artifact-repository.js');
+  const server = await backend('src/artifact-server.js');
+  const migration = await backend('sql/0012_store_bootstrap_distribution.sql');
+
+  assert.match(repository, /get_store_bootstrap_release/);
+  assert.match(server, /\/v1\/bootstrap\/aarulya-store\.apk/);
+  assert.match(server, /getStoreBootstrapRelease/);
+  assert.match(migration, /safe_versions/);
+  assert.match(migration, /com\.aarulya\.store/);
+  assert.match(migration, /v\.status = 'published'/);
+  assert.match(migration, /v\.revoked_at IS NULL/);
+  assert.match(migration, /signature_verification = 'passed'/);
+  assert.match(migration, /transparency_inclusion = 'verified'/);
+  assert.match(migration, /distribution_kill_switches/);
+  assert.match(migration, /GRANT EXECUTE ON FUNCTION get_store_bootstrap_release\(\) TO aarulya_store_downloads/);
+});
+
 test('download grants are one-time, deterministic and cannot be resurrected by idempotency replay', async () => {
   const idempotent = await backend('src/idempotent-store-repository.js');
   const repository = await backend('src/artifact-repository.js');
