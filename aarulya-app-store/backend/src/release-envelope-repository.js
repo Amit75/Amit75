@@ -41,9 +41,11 @@ export class PostgreSqlReleaseEnvelopeRepository {
        JOIN aarulya_store.apps a ON a.id = v.app_id
        JOIN aarulya_store.trusted_signing_keys k ON k.key_id = e.signing_key_id
        WHERE a.id = $1
+         AND v.id = (SELECT safe.app_version_id FROM aarulya_store.safe_versions safe WHERE safe.app_id = a.id)
          AND v.status = 'published'
          AND v.revoked_at IS NULL
          AND e.expires_at > now()
+         AND k.purpose = 'release-manifest'
          AND k.state IN ('active', 'retiring')
          AND now() BETWEEN k.not_before AND k.not_after
          ${versionClause}
