@@ -232,7 +232,7 @@ test('commercial readiness distinguishes proven CI gates from external execution
     manifest.distributionSafety.finalSignedEvidence
   ]) assert.equal(status, 'PARTIAL');
 
-  assert.equal(manifest.distributionSafety.physicalDeviceAcceptance, 'MISSING');
+  assert.equal(manifest.distributionSafety.physicalDeviceAcceptance, 'PARTIAL');
   assert.equal(manifest.launchFlags.publicProduction, false);
   assert.equal(manifest.launchFlags.livePayments, false);
   assert.equal(manifest.ciEvidenceBoundary.ciTestApkIsProductionSigned, false);
