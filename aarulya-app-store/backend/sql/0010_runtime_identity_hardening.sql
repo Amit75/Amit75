@@ -24,7 +24,7 @@ GRANT SELECT ON
 TO aarulya_store_publisher;
 
 GRANT UPDATE (status, published_at) ON app_versions TO aarulya_store_publisher;
-GRANT INSERT, UPDATE (app_version_id, selected_at) ON safe_versions TO aarulya_store_publisher;
+GRANT INSERT, UPDATE (app_version_id, selected_by, selected_at) ON safe_versions TO aarulya_store_publisher;
 GRANT INSERT ON release_publication_receipts TO aarulya_store_publisher;
 
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA aarulya_store
