@@ -32,11 +32,13 @@ test('web catalog hands published installs to the canonical Store app-link only'
   assert.doesNotMatch(webApp, /downloads\.store\.aarulya\.com/u);
 });
 
-test('browser fallback never exposes an APK, access token or download grant', () => {
-  assert.match(installPage, /कोई APK, access token या one-time download grant सीधे नहीं दिया जाता/u);
+test('browser bootstrap exposes only the canonical Store APK and no bearer grant', () => {
   assert.match(installScript, /CANONICAL_ORIGIN = 'https:\/\/store\.aarulya\.com'/u);
+  assert.match(installScript, /STORE_BOOTSTRAP_URL = 'https:\/\/downloads\.store\.aarulya\.com\/v1\/bootstrap\/aarulya-store\.apk'/u);
+  assert.match(installScript, /appId === 'aarulya-store'/u);
+  assert.match(installScript, /authenticated one-time grant flow/u);
   assert.match(installScript, /onlyAppParameter/u);
-  assert.doesNotMatch(`${installPage}\n${installScript}`, /downloads\.store\.aarulya\.com|authorization\s*:\s*bearer|apkUrl/iu);
+  assert.doesNotMatch(`${installPage}\n${installScript}`, /authorization\s*:\s*bearer|access_token|grantId/iu);
 });
 
 test('Android accepts only the exact canonical install link and encrypted pending state', () => {
