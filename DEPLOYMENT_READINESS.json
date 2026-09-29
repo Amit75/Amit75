@@ -26,7 +26,9 @@
     "format": "checksum-bound tar.gz",
     "containsSecrets": false,
     "containsSigningKeys": false,
-    "centralOperation": "Authenticated catalog and aggregate release status APIs only"
+    "centralOperation": "Authenticated catalog and aggregate release status APIs only",
+    "productionPreflight": "aarulya-app-store/deploy/verify-production-preflight.sh",
+    "productionPreflightMode": "read-only-fail-closed"
   },
   "claimBoundary": "Aarulya Store is not production-ready and no signed public release is claimed until every gate has current exact-head evidence."
 }

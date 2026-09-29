@@ -161,6 +161,27 @@ test('Android release build, OAuth callback and install flow fail closed', async
   assert.match(verifier, /installed-signer-continuity-failed/);
 });
 
+test('production preflight is read-only and fail-closed on external launch gates', async () => {
+  const preflight = await store('deploy/verify-production-preflight.sh');
+
+  assert.match(preflight, /AARULYA_SOURCE_COMMIT_SHA-required/);
+  assert.match(preflight, /exact-head-mismatch/);
+  assert.match(preflight, /immutable-image-digest-required/);
+  assert.match(preflight, /secret-must-be-regular-nonsymlink/);
+  assert.match(preflight, /secret-group-or-world-readable/);
+  assert.match(preflight, /production-compose-invalid/);
+  for (const host of [
+    'store.aarulya.com',
+    'api.store.aarulya.com',
+    'downloads.store.aarulya.com',
+    'evidence.store.aarulya.com',
+    'identity.aarulya.com'
+  ]) assert.match(preflight, new RegExp(host.replaceAll('.', '\\\\.')));
+  assert.match(preflight, /policy-not-active/);
+  assert.match(preflight, /AARULYA_STORE_PRODUCTION_PREFLIGHT=PASS/);
+  assert.doesNotMatch(preflight, /cat\s+["']?\$?\{?!secret/i);
+});
+
 test('production packaging isolates every database identity and exposes only the edge', async () => {
   const compose = await store('deploy/compose.production.yml');
   const dockerfile = await backend('Dockerfile');
