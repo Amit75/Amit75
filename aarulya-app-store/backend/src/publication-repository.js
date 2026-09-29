@@ -14,10 +14,139 @@ function positiveInteger(name, value) {
   return normalized;
 }
 
+function requiredUuid(name, value) {
+  const normalized = String(value || '');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalized)) {
+    throw new Error(`${name}-invalid`);
+  }
+  return normalized;
+}
+
 export class PostgreSqlPublicationRepository {
   constructor(pool) {
     if (!pool) throw new Error('postgres-pool-required');
     this.pool = pool;
+  }
+
+  async selectSafeVersion({ appId, versionCode, requestId, actorSubject, selectedBy, reason }) {
+    const normalizedAppId = requiredText('app-id', appId, 2, 160);
+    const normalizedVersionCode = positiveInteger('version-code', versionCode);
+    const normalizedRequestId = requiredText('request-id', requestId, 16, 200);
+    const normalizedActorSubject = requiredText('actor-subject', actorSubject, 8, 512);
+    const normalizedSelectedBy = requiredUuid('selected-by', selectedBy);
+    const normalizedReason = requiredText('rollback-reason', reason, 12, 2000);
+
+    return withTransaction(this.pool, async (client) => {
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1), $2)', [normalizedAppId, normalizedVersionCode]);
+
+      const replayResult = await client.query(
+        `SELECT receipt.id, receipt.app_id, receipt.previous_app_version_id,
+                receipt.selected_app_version_id, receipt.change_kind, receipt.changed_at,
+                selected.version_code AS selected_version_code, app.package_id
+         FROM aarulya_store.safe_version_change_receipts receipt
+         JOIN aarulya_store.app_versions selected ON selected.id = receipt.selected_app_version_id
+         JOIN aarulya_store.apps app ON app.id = receipt.app_id
+         WHERE receipt.request_id = $1`,
+        [normalizedRequestId]
+      );
+      if (replayResult.rows[0]) {
+        const replay = replayResult.rows[0];
+        if (replay.app_id !== normalizedAppId || Number(replay.selected_version_code) !== normalizedVersionCode) {
+          const error = new Error('safe-version-idempotency-conflict');
+          error.status = 409;
+          throw error;
+        }
+        return Object.freeze({
+          safeVersionReceiptId: String(replay.id),
+          appId: replay.app_id,
+          packageId: replay.package_id,
+          versionCode: Number(replay.selected_version_code),
+          changeKind: replay.change_kind,
+          changedAt: new Date(replay.changed_at).toISOString(),
+          idempotentReplay: true
+        });
+      }
+
+      const targetResult = await client.query(
+        `SELECT v.id, v.version_code, a.package_id,
+                current_safe.app_version_id AS previous_app_version_id,
+                previous.version_code AS previous_version_code
+         FROM aarulya_store.app_versions v
+         JOIN aarulya_store.apps a ON a.id = v.app_id
+         LEFT JOIN aarulya_store.safe_versions current_safe ON current_safe.app_id = v.app_id
+         LEFT JOIN aarulya_store.app_versions previous ON previous.id = current_safe.app_version_id
+         WHERE v.app_id = $1
+           AND v.version_code = $2
+           AND v.status = 'published'
+           AND v.revoked_at IS NULL
+           AND v.publication_gate_status = 'passed'
+           AND v.final_evidence_report_signature_verification = 'passed'
+           AND v.final_evidence_report_transparency_inclusion = 'verified'
+           AND EXISTS (
+             SELECT 1
+             FROM aarulya_store.signed_release_envelopes envelope
+             JOIN aarulya_store.trusted_signing_keys key ON key.key_id = envelope.signing_key_id
+             WHERE envelope.app_version_id = v.id
+               AND envelope.payload_sha256 = v.release_manifest_sha256
+               AND envelope.signature_verification = 'passed'
+               AND envelope.transparency_inclusion = 'verified'
+               AND envelope.expires_at > now()
+               AND key.purpose = 'release-manifest'
+               AND key.state IN ('active', 'retiring')
+               AND now() BETWEEN key.not_before AND key.not_after
+           )
+         LIMIT 1`,
+        [normalizedAppId, normalizedVersionCode]
+      );
+      const target = targetResult.rows[0];
+      if (!target) {
+        const error = new Error('safe-version-target-not-eligible');
+        error.status = 409;
+        throw error;
+      }
+
+      const previousVersionCode = target.previous_version_code == null
+        ? null
+        : Number(target.previous_version_code);
+      const changeKind = previousVersionCode == null
+        ? 'initial'
+        : normalizedVersionCode < previousVersionCode
+          ? 'rollback'
+          : normalizedVersionCode > previousVersionCode
+            ? 'forward'
+            : 'reselect';
+
+      await client.query(
+        `INSERT INTO aarulya_store.safe_versions (app_id, app_version_id, selected_by, selected_at)
+         VALUES ($1, $2, $3, now())
+         ON CONFLICT (app_id) DO UPDATE SET
+           app_version_id = EXCLUDED.app_version_id,
+           selected_by = EXCLUDED.selected_by,
+           selected_at = EXCLUDED.selected_at`,
+        [normalizedAppId, target.id, normalizedSelectedBy]
+      );
+
+      const receiptResult = await client.query(
+        `INSERT INTO aarulya_store.safe_version_change_receipts
+          (app_id, previous_app_version_id, selected_app_version_id, request_id,
+           actor_subject, reason, change_kind, changed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+         RETURNING id, changed_at`,
+        [normalizedAppId, target.previous_app_version_id, target.id, normalizedRequestId,
+          normalizedActorSubject, normalizedReason, changeKind]
+      );
+
+      return Object.freeze({
+        safeVersionReceiptId: String(receiptResult.rows[0].id),
+        appId: normalizedAppId,
+        packageId: target.package_id,
+        versionCode: normalizedVersionCode,
+        previousVersionCode,
+        changeKind,
+        changedAt: new Date(receiptResult.rows[0].changed_at).toISOString(),
+        idempotentReplay: false
+      });
+    });
   }
 
   async publish({ appId, versionCode, requestId, actorSubject, reason }) {
