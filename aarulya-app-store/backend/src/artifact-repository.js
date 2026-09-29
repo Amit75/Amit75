@@ -15,6 +15,31 @@ export class PostgreSqlArtifactRepository {
     this.pool = pool;
   }
 
+  async getStoreBootstrapRelease() {
+    return withTransaction(this.pool, async (client) => {
+      const result = await client.query(
+        'SELECT * FROM aarulya_store.get_store_bootstrap_release()'
+      );
+      const row = result.rows[0];
+      if (!row) {
+        const error = new Error('store-bootstrap-release-unavailable');
+        error.status = 404;
+        throw error;
+      }
+      return Object.freeze({
+        releaseId: String(row.release_id),
+        objectKey: row.object_key,
+        apkSha256: row.apk_sha256,
+        apkSizeBytes: row.apk_size_bytes ? Number(row.apk_size_bytes) : null,
+        packageId: row.package_id,
+        versionCode: Number(row.version_code),
+        signerFingerprint: row.signer_fingerprint,
+        signingKeyId: row.signing_key_id,
+        evidenceReportSha256: row.evidence_report_sha256
+      });
+    });
+  }
+
   async consumeGrant(grantId, token) {
     if (!validUuid(grantId)) {
       const error = new Error('valid-download-grant-required');
