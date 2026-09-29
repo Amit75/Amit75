@@ -56,6 +56,8 @@ for secret_var in "${secret_vars[@]}"; do
   [[ "$resolved" != "$REPO_ROOT/"* ]] || fail "secret-inside-repository:$secret_var"
   links="$(stat -c '%h' "$path")"
   [[ "$links" == '1' ]] || fail "secret-hardlink-count-invalid:$secret_var"
+  owner_uid="$(stat -c '%u' "$path")"
+  [[ "$owner_uid" == '0' ]] || fail "secret-owner-must-be-root:$secret_var"
   permission="$(stat -c '%a' "$path")"
   mode=$((8#$permission))
   (( (mode & 077) == 0 )) || fail "secret-group-or-world-readable:$secret_var"

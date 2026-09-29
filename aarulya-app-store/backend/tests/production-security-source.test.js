@@ -169,6 +169,7 @@ test('production preflight is read-only and fail-closed on external launch gates
   assert.match(preflight, /immutable-image-digest-required/);
   assert.match(preflight, /secret-must-be-regular-nonsymlink/);
   assert.match(preflight, /secret-group-or-world-readable/);
+  assert.match(preflight, /secret-owner-must-be-root/);
   assert.match(preflight, /production-compose-invalid/);
   for (const host of [
     'store.aarulya.com',
@@ -176,7 +177,7 @@ test('production preflight is read-only and fail-closed on external launch gates
     'downloads.store.aarulya.com',
     'evidence.store.aarulya.com',
     'identity.aarulya.com'
-  ]) assert.match(preflight, new RegExp(host.replaceAll('.', '\\\\.')));
+  ]) assert.match(preflight, new RegExp(host.replaceAll('.', '\\.')));
   assert.match(preflight, /policy-not-active/);
   assert.match(preflight, /AARULYA_STORE_PRODUCTION_PREFLIGHT=PASS/);
   assert.doesNotMatch(preflight, /cat\s+["']?\$?\{?!secret/i);
