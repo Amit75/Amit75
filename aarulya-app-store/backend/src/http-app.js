@@ -89,6 +89,9 @@ function requirementsFor(method, pathname) {
   if (method === 'POST' && pathname === '/api/v1/admin/releases/publish') {
     return { scopes: ['store:release:publish'], stepUp: true };
   }
+  if (method === 'POST' && pathname.startsWith('/api/v1/admin/apps/') && pathname.endsWith('/safe-version')) {
+    return { scopes: ['store:release:rollback'], stepUp: true };
+  }
   if (method === 'GET' && (pathname === '/api/v1/catalog' || pathname.startsWith('/api/v1/apps/'))) return { scopes: ['store:read'] };
   if (method === 'POST' && pathname === '/api/v1/actions/resolve') return { scopes: ['store:read'] };
   if (method === 'POST' && pathname === '/api/v1/downloads/authorize') return { scopes: ['store:download'] };
