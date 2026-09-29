@@ -2,6 +2,7 @@ package com.aarulya.store.catalog
 
 import com.aarulya.store.api.StoreApiClient
 import com.aarulya.store.auth.StoreSession
+import java.util.Locale
 
 class RemoteCatalogRepository(private val api: StoreApiClient = StoreApiClient()) {
     fun refresh(session: StoreSession): List<StoreApp> {
@@ -52,9 +53,9 @@ class RemoteCatalogRepository(private val api: StoreApiClient = StoreApiClient()
     }
 
     private fun formatBytes(bytes: Long): String = when {
-        bytes >= 1024L * 1024L * 1024L -> String.format("%.1f GB", bytes.toDouble() / (1024L * 1024L * 1024L))
-        bytes >= 1024L * 1024L -> String.format("%.1f MB", bytes.toDouble() / (1024L * 1024L))
-        bytes >= 1024L -> String.format("%.1f KB", bytes.toDouble() / 1024L)
+        bytes >= 1024L * 1024L * 1024L -> String.format(Locale.ROOT, "%.1f GB", bytes.toDouble() / (1024L * 1024L * 1024L))
+        bytes >= 1024L * 1024L -> String.format(Locale.ROOT, "%.1f MB", bytes.toDouble() / (1024L * 1024L))
+        bytes >= 1024L -> String.format(Locale.ROOT, "%.1f KB", bytes.toDouble() / 1024L)
         else -> "$bytes B"
     }
 }
