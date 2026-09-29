@@ -212,3 +212,33 @@ test('production packaging isolates every database identity and exposes only the
     'evidence.store.aarulya.com'
   ]) assert.match(caddy, new RegExp(host.replaceAll('.', '\\.'), 'g'));
 });
+
+
+test('commercial readiness distinguishes proven CI gates from external execution gates', async () => {
+  const manifest = JSON.parse(await readFile(new URL('../../../commercial-readiness/product-readiness.v1.json', import.meta.url), 'utf8'));
+
+  assert.equal(manifest.gates.exactHeadCI, 'PASS');
+  assert.equal(manifest.gates.dependencyAudit, 'PASS');
+  assert.equal(manifest.distributionSafety.androidBuild, 'PASS');
+
+  for (const status of [
+    manifest.gates.stagingDeployment,
+    manifest.gates.customerPilot,
+    manifest.distributionSafety.offlineSigningCeremony,
+    manifest.distributionSafety.independentRebuild,
+    manifest.distributionSafety.malwareAndSecurityTesting,
+    manifest.distributionSafety.penetrationAndReverseEngineeringAssessment,
+    manifest.distributionSafety.keyCompromiseRecovery,
+    manifest.distributionSafety.finalSignedEvidence
+  ]) assert.equal(status, 'PARTIAL');
+
+  assert.equal(manifest.distributionSafety.physicalDeviceAcceptance, 'MISSING');
+  assert.equal(manifest.launchFlags.publicProduction, false);
+  assert.equal(manifest.launchFlags.livePayments, false);
+  assert.equal(manifest.ciEvidenceBoundary.ciTestApkIsProductionSigned, false);
+
+  for (const path of Object.values(manifest.sourceAcceptanceControls)) {
+    assert.equal(typeof path, 'string');
+    assert.ok(path.length > 0);
+  }
+});

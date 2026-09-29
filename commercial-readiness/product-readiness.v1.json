@@ -46,17 +46,17 @@
     "publicProduction": false
   },
   "gates": {
-    "exactHeadCI": "MISSING",
-    "dependencyAudit": "MISSING",
+    "exactHeadCI": "PASS",
+    "dependencyAudit": "PASS",
     "securityReview": "PARTIAL",
-    "stagingDeployment": "MISSING",
+    "stagingDeployment": "PARTIAL",
     "backupRestore": "PARTIAL",
     "rollback": "PARTIAL",
     "privacyPack": "PARTIAL",
     "legalTerms": "PARTIAL",
     "pricingBilling": "PARTIAL",
     "supportSLA": "PARTIAL",
-    "customerPilot": "MISSING",
+    "customerPilot": "PARTIAL",
     "indiaCountryPack": "PARTIAL",
     "internationalCountryPack": "MISSING"
   },
@@ -105,15 +105,15 @@
     "v1SigningDisabled": true,
     "v2AndV3SigningRequired": true,
     "releaseEnvelopeKeyFingerprintPinningRequired": true,
-    "offlineSigningCeremony": "MISSING",
-    "androidBuild": "MISSING",
+    "offlineSigningCeremony": "PARTIAL",
+    "androidBuild": "PASS",
     "physicalDeviceAcceptance": "MISSING",
-    "independentRebuild": "MISSING",
-    "malwareAndSecurityTesting": "MISSING",
-    "penetrationAndReverseEngineeringAssessment": "MISSING",
-    "keyCompromiseRecovery": "MISSING",
+    "independentRebuild": "PARTIAL",
+    "malwareAndSecurityTesting": "PARTIAL",
+    "penetrationAndReverseEngineeringAssessment": "PARTIAL",
+    "keyCompromiseRecovery": "PARTIAL",
     "disasterRecovery": "PARTIAL",
-    "finalSignedEvidence": "MISSING"
+    "finalSignedEvidence": "PARTIAL"
   },
   "sourcePolicyPack": {
     "activationState": "PRELAUNCH_DRAFT",
@@ -126,5 +126,21 @@
       "support": "aarulya-app-store/policies/support.html",
       "pricing": "aarulya-app-store/policies/pricing.html"
     }
+  },
+  "sourceAcceptanceControls": {
+    "staging": "aarulya-app-store/docs/STAGING_ACCEPTANCE.md",
+    "offlineSigning": "aarulya-app-store/docs/OFFLINE_SIGNING_CEREMONY.md",
+    "independentRebuild": "aarulya-app-store/docs/INDEPENDENT_REBUILD_ACCEPTANCE.md",
+    "malwareSecurity": "aarulya-app-store/docs/MALWARE_SECURITY_ACCEPTANCE.md",
+    "penetrationReverseEngineering": "aarulya-app-store/docs/PENETRATION_REVERSE_ENGINEERING_ACCEPTANCE.md",
+    "keyCompromiseRecovery": "aarulya-app-store/docs/KEY_COMPROMISE_RECOVERY.md",
+    "customerPilot": "aarulya-app-store/docs/CUSTOMER_PILOT_ACCEPTANCE.md",
+    "finalReleaseEvidence": "aarulya-app-store/docs/FINAL_RELEASE_EVIDENCE_REPORT.md"
+  },
+  "ciEvidenceBoundary": {
+    "exactHeadWorkflow": "Aarulya Store end-to-end source verification",
+    "commercialReadinessWorkflow": "Commercial Readiness Radar",
+    "currentBranchMustRemainGreen": true,
+    "ciTestApkIsProductionSigned": false
   }
 }

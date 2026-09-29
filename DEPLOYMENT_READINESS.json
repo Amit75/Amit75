@@ -6,7 +6,7 @@
   "authoritativeBranch": "agent/aarulya-app-store-foundation",
   "pullRequest": 2,
   "owner": "Amit Kumar",
-  "status": "ANDROID_DISTRIBUTION_ACCEPTANCE_PENDING",
+  "status": "SOURCE_ACCEPTANCE_GREEN_EXTERNAL_RELEASE_GATES_PENDING",
   "productionDeployed": false,
   "gates": [
     "exact-head source identity",
@@ -30,5 +30,26 @@
     "productionPreflight": "aarulya-app-store/deploy/verify-production-preflight.sh",
     "productionPreflightMode": "read-only-fail-closed"
   },
-  "claimBoundary": "Aarulya Store is not production-ready and no signed public release is claimed until every gate has current exact-head evidence."
+  "claimBoundary": "Aarulya Store is not production-ready and no signed public release is claimed until every gate has current exact-head evidence.",
+  "completedSourceGates": [
+    "exact-head source identity",
+    "locked dependency install and audits",
+    "database migration and role acceptance",
+    "Android locked build and CI test-signature verification",
+    "production composition source validation",
+    "fail-closed commercial readiness validation"
+  ],
+  "pendingExternalGates": [
+    "identity and owner publication authorization",
+    "isolated staging execution",
+    "offline production signing and certificate continuity",
+    "independent rebuild execution",
+    "malware and security assessment execution",
+    "penetration and reverse-engineering assessment",
+    "physical-device installation and update acceptance",
+    "DNS TLS download and evidence service acceptance",
+    "backup restore monitoring and rollback drill",
+    "controlled customer pilot",
+    "owner approval bound to exact final release SHA"
+  ]
 }
