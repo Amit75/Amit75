@@ -134,6 +134,9 @@ jobs:
             IF NOT has_function_privilege('aarulya_store_downloads', 'aarulya_store.consume_download_grant(uuid,text)', 'EXECUTE') THEN
               RAISE EXCEPTION 'downloads role lacks bounded grant-consumption function';
             END IF;
+            IF NOT has_function_privilege('aarulya_store_downloads', 'aarulya_store.get_store_bootstrap_release()', 'EXECUTE') THEN
+              RAISE EXCEPTION 'downloads role lacks bounded Store bootstrap function';
+            END IF;
             IF has_sequence_privilege('aarulya_store_api', 'aarulya_store.security_audit_sequence_seq', 'USAGE') THEN
               RAISE EXCEPTION 'API role retained excessive sequence access';
             END IF;
