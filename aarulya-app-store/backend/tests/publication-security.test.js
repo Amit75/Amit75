@@ -31,8 +31,12 @@ function service() {
       now: () => NOW,
       publicationRepository: {
         async publish(input) {
-          calls.push(input);
+          calls.push({ operation: 'publish', ...input });
           return { publicationReceiptId: 'receipt-1', ...input };
+        },
+        async selectSafeVersion(input) {
+          calls.push({ operation: 'select-safe-version', ...input });
+          return { safeVersionReceiptId: 'safe-receipt-1', ...input };
         }
       }
     })
@@ -80,9 +84,40 @@ test('authorized step-up owner passes only normalized publication fields to repo
   });
   assert.equal(calls.length, 1);
   assert.deepEqual(Object.keys(calls[0]).sort(), [
-    'actorSubject', 'appId', 'reason', 'requestId', 'versionCode'
+    'actorSubject', 'appId', 'operation', 'reason', 'requestId', 'versionCode'
   ]);
+  assert.equal(calls[0].operation, 'publish');
   assert.equal('privateKey' in calls[0], false);
+});
+
+
+test('safe-version rollback requires the dedicated rollback scope', async () => {
+  const { value } = service();
+  await assert.rejects(
+    value.selectSafeVersion(ownerIdentity({ scopes: ['store:release:publish'] }), {
+      appId: 'aarulya-store', versionCode: 1, requestId: 'request-000000000005', reason: 'Return to verified safe release'
+    }),
+    (error) => error.code === 'release-rollback-scope-required'
+  );
+});
+
+test('authorized owner safe-version change binds actor and exact target', async () => {
+  const { value, calls } = service();
+  const identity = ownerIdentity({ scopes: ['store:release:rollback'] });
+  await value.selectSafeVersion(identity, {
+    appId: 'aarulya-store',
+    versionCode: 1,
+    requestId: 'request-000000000006',
+    reason: 'Return to verified safe release',
+    privateKey: 'must-never-be-forwarded'
+  });
+  const call = calls.at(-1);
+  assert.equal(call.operation, 'select-safe-version');
+  assert.equal(call.appId, 'aarulya-store');
+  assert.equal(call.versionCode, 1);
+  assert.equal(call.selectedBy, identity.actorId);
+  assert.equal(call.actorSubject, identity.externalSubject);
+  assert.equal('privateKey' in call, false);
 });
 
 test('database publication guard requires risk-tier approvals and critical evidence', async () => {
