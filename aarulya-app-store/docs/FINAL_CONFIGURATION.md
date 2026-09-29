@@ -11,9 +11,9 @@ The four origins are isolated. Cross-origin access is deny-by-default. The API p
 
 ## Legal and product identity
 
-- Legal operator: Aarulya DigitalWorks
-- Legal form: Sole Proprietorship
-- Proprietor: Soni Kumari
+- Legal operator: must match the then-current legally registered Aarulya operating entity at production release time
+- Legal form and authorized signatory: deployment-time verified configuration; not hard-coded in source
+- Production publication is blocked if the displayed legal identity does not match the verified registration and support records
 - Brand: Aarulya
 - Product: Aarulya Store
 - Android application ID: `com.aarulya.store`

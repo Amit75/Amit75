@@ -161,6 +161,7 @@ services:
       - ../polish.css:/srv/storefront/polish.css:ro
       - ../assets:/srv/storefront/assets:ro
       - ../src:/srv/storefront/src:ro
+      - ../install:/srv/storefront/install:ro
       - caddy_data:/data
       - caddy_config:/config
 

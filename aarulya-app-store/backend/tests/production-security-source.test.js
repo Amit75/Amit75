@@ -104,6 +104,9 @@ test('Android release build, OAuth callback and install flow fail closed', async
   assert.doesNotMatch(manifest, /aarulya-store/);
   assert.match(oidc, /verified-https-redirect-required/);
   assert.match(oidc, /identity-redirect-prohibited/);
+  assert.match(build, /https:\/\/api\.store\.aarulya\.com\/api\/v1/);
+  assert.match(api, /baseUri\.path == "\/api\/v1"/);
+  assert.match(api, /startsWith\("\/api\/v1\/"\)/);
   assert.match(api, /json-response-required/);
   assert.match(api, /connection\.disconnect\(\)/);
   assert.match(envelope, /no-pinned-release-trust-root/);
@@ -131,6 +134,7 @@ test('production packaging isolates every database identity and exposes only the
   assert.match(compose, /private:\n\s+internal: true/);
   assert.match(compose, /cap_drop: \["ALL"\]/);
   assert.match(compose, /no-new-privileges:true/);
+  assert.match(compose, /\.\.\/install:\/srv\/storefront\/install:ro/);
   assert.doesNotMatch(compose, /5432:5432/);
   assert.doesNotMatch(compose, /8080:8080/);
   assert.match(dockerfile, /node:22\.23\.2-bookworm-slim@sha256:/);

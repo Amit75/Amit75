@@ -38,8 +38,7 @@ The Android system confirmation screen remains mandatory. Silent or hidden insta
 ## Build baseline
 
 - Android Gradle Plugin 9.3.0
-- Kotlin Android plugin 2.3.21
-- Compile/target SDK 37
+- Compile/target SDK 36
 - Minimum SDK 26
 - Cleartext network traffic disabled
 - Release minification and resource shrinking enabled
@@ -47,4 +46,4 @@ The Android system confirmation screen remains mandatory. Silent or hidden insta
 
 ## Current boundary
 
-This is source foundation only. It is not yet a signed, installed or production-verified APK. Build execution, device tests, permission-flow tests, installer tests, signer verification tests and final evidence reports remain required before publication.
+CI now executes release lint, debug/release APK builds and APK signature-scheme verification with a disposable CI-only signing identity. This does not make the artifact a production release. Aarulya-controlled production signing, physical-device install/update/permission tests, production identity/DNS/TLS, immutable release evidence and final publication approval remain required.

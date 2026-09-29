@@ -19,7 +19,7 @@ class StoreApiClient {
             baseUri.scheme == "https" &&
                 trustedHost == "api.store.aarulya.com" &&
                 baseUri.port == -1 &&
-                baseUri.path == "/v1"
+                baseUri.path == "/api/v1"
         ) { "canonical-store-api-origin-required" }
     }
 
@@ -117,7 +117,7 @@ class StoreApiClient {
             uri.scheme == "https" &&
                 uri.host == trustedHost &&
                 uri.port == -1 &&
-                uri.path?.startsWith("/v1/") == true
+                uri.path?.startsWith("/api/v1/") == true
         ) { "trusted-api-origin-required" }
         val bodyBytes = body?.toString()?.toByteArray(Charsets.UTF_8)
         require(bodyBytes == null || bodyBytes.size <= 1024 * 1024) { "request-body-too-large" }

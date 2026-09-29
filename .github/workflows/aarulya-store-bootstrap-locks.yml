@@ -202,7 +202,10 @@ jobs:
             echo 'Reproducibility files are already current.'
             exit 0
           fi
-          git diff --cached --check
+          # Gradle's generated Windows wrapper intentionally uses CRLF. Check every
+          # generated source/metadata file for whitespace errors without treating
+          # the standard batch-file line endings as trailing whitespace.
+          git diff --cached --check -- . ':(exclude)aarulya-app-store/android-store/gradlew.bat'
           git fetch --no-tags origin "$STORE_BOOTSTRAP_BRANCH"
           test "$(git rev-parse "origin/$STORE_BOOTSTRAP_BRANCH")" = "$STORE_BOOTSTRAP_HEAD"
           git commit -m 'Lock Aarulya Store reproducible builds [aarulya-lock-bootstrap]'
