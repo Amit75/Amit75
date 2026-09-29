@@ -14,6 +14,7 @@ The store is one unified platform, not a collection of separate zone stores and 
 - Curated shelves such as Daily Essentials, Documents, Creator Tools, Games, Books & Learning, Farmer & Rural, Business, and Safety & Cloud
 - Dedicated platform apps including Aarulya Play, Aarulya Books, Aarulya Cinema, Aarulya Kisan and Aarulya Learning
 - Verified APK download and installation handoff
+- Public first-install bootstrap restricted to the current safe, verified `com.aarulya.store` release; every other APK remains behind the authenticated Store grant flow
 - Signed updates, staged rollout, revocation and safe rollback
 - Aarulya-owned APIs, database, object storage and durable job execution
 
