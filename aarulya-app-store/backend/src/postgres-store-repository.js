@@ -99,6 +99,14 @@ const RELEASE_SELECT = `
   JOIN aarulya_store.apps a ON a.id = v.app_id
 `;
 
+const SAFE_VERSION_SELECTED = `
+  v.id = (
+    SELECT safe.app_version_id
+    FROM aarulya_store.safe_versions safe
+    WHERE safe.app_id = v.app_id
+  )
+`;
+
 const VALID_PUBLISHED_RELEASE = `
   v.status = 'published'
   AND v.revoked_at IS NULL
@@ -159,7 +167,7 @@ export class PostgreSqlStoreRepository {
          SELECT v.version_code, COALESCE(v.version_name_display, v.version_name) AS version_name,
                 v.apk_size_bytes
          FROM aarulya_store.app_versions v
-         WHERE v.app_id = a.id AND ${VALID_PUBLISHED_RELEASE}
+         WHERE v.app_id = a.id AND ${SAFE_VERSION_SELECTED} AND ${VALID_PUBLISHED_RELEASE}
          ORDER BY v.version_code DESC
          LIMIT 1
        ) release ON true
@@ -217,7 +225,7 @@ export class PostgreSqlStoreRepository {
     }
     const result = await this.pool.query(
       `${RELEASE_SELECT}
-       WHERE v.app_id = $1 AND ${VALID_PUBLISHED_RELEASE}
+       WHERE v.app_id = $1 AND ${SAFE_VERSION_SELECTED} AND ${VALID_PUBLISHED_RELEASE}
          ${versionFilter}
        ORDER BY v.version_code DESC
        LIMIT 1`,
@@ -473,7 +481,7 @@ export class PostgreSqlStoreRepository {
       }
       const releaseResult = await client.query(
         `${RELEASE_SELECT}
-         WHERE a.package_id = $1 AND v.version_code > $2 AND ${VALID_PUBLISHED_RELEASE}
+         WHERE a.package_id = $1 AND v.version_code > $2 AND ${SAFE_VERSION_SELECTED} AND ${VALID_PUBLISHED_RELEASE}
          ORDER BY v.version_code DESC LIMIT 1`,
         [String(packageId), Number(installedVersionCode)]
       );

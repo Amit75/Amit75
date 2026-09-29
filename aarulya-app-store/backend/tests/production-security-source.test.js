@@ -68,6 +68,15 @@ test('database and release migrations require immutable signed evidence and isol
   assert.match(hardening, /REVOKE ALL ON ALL SEQUENCES IN SCHEMA aarulya_store/);
 });
 
+test('catalog, downloads and updates follow the explicit safe-version pointer', async () => {
+  const repository = await backend('src/postgres-store-repository.js');
+
+  assert.match(repository, /const SAFE_VERSION_SELECTED/);
+  assert.match(repository, /FROM aarulya_store\.safe_versions safe/);
+  assert.match(repository, /WHERE safe\.app_id = v\.app_id/);
+  assert.equal((repository.match(/\$\{SAFE_VERSION_SELECTED\}/gu) ?? []).length, 3);
+});
+
 test('download grants are one-time, deterministic and cannot be resurrected by idempotency replay', async () => {
   const idempotent = await backend('src/idempotent-store-repository.js');
   const repository = await backend('src/artifact-repository.js');
