@@ -187,6 +187,21 @@ export function createHttpHandler({
         return writeJson(response, 201, result, requestId, acceptedOrigin);
       }
 
+      const safeVersionParams = method === 'POST'
+        ? routeMatch(pathname, '/api/v1/admin/apps/:appId/safe-version')
+        : null;
+      if (safeVersionParams) {
+        const body = await readJson(request);
+        const idempotencyKey = requireIdempotency(request);
+        const result = await publicationService.selectSafeVersion(context, {
+          appId: safeVersionParams.appId,
+          versionCode: body.versionCode,
+          reason: body.reason,
+          requestId: idempotencyKey
+        });
+        return writeJson(response, 200, result, requestId, acceptedOrigin);
+      }
+
       if (method === 'GET' && pathname === '/api/v1/catalog') {
         const result = await service.listCatalog({
           category: url.searchParams.get('category'),
