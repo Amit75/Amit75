@@ -77,6 +77,16 @@ test('catalog, downloads and updates follow the explicit safe-version pointer', 
   assert.equal((repository.match(/\$\{SAFE_VERSION_SELECTED\}/gu) ?? []).length, 3);
 });
 
+test('release envelope and catalog trust are bound to safe versions and key purpose', async () => {
+  const envelopes = await backend('src/release-envelope-repository.js');
+  const repository = await backend('src/postgres-store-repository.js');
+
+  assert.match(envelopes, /safe_versions safe/);
+  assert.match(envelopes, /k\.purpose = 'release-manifest'/);
+  assert.match(repository, /key\.purpose = 'release-manifest'/);
+  assert.match(repository, /key\.purpose = 'catalog'/);
+});
+
 test('public Store bootstrap is constrained to the verified safe Store release', async () => {
   const repository = await backend('src/artifact-repository.js');
   const server = await backend('src/artifact-server.js');
