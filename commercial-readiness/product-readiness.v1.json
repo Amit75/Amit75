@@ -35,7 +35,7 @@
     },
     "international": {
       "state": "BLOCKED",
-      "countryPack": "MISSING"
+      "countryPack": "PARTIAL"
     }
   },
   "launchFlags": {
@@ -58,7 +58,7 @@
     "supportSLA": "PARTIAL",
     "customerPilot": "PARTIAL",
     "indiaCountryPack": "PARTIAL",
-    "internationalCountryPack": "MISSING"
+    "internationalCountryPack": "PARTIAL"
   },
   "revenueTruth": {
     "actualIncomeRequiresSettledEvidence": true,
@@ -107,7 +107,7 @@
     "releaseEnvelopeKeyFingerprintPinningRequired": true,
     "offlineSigningCeremony": "PARTIAL",
     "androidBuild": "PASS",
-    "physicalDeviceAcceptance": "MISSING",
+    "physicalDeviceAcceptance": "PARTIAL",
     "independentRebuild": "PARTIAL",
     "malwareAndSecurityTesting": "PARTIAL",
     "penetrationAndReverseEngineeringAssessment": "PARTIAL",
@@ -135,7 +135,11 @@
     "penetrationReverseEngineering": "aarulya-app-store/docs/PENETRATION_REVERSE_ENGINEERING_ACCEPTANCE.md",
     "keyCompromiseRecovery": "aarulya-app-store/docs/KEY_COMPROMISE_RECOVERY.md",
     "customerPilot": "aarulya-app-store/docs/CUSTOMER_PILOT_ACCEPTANCE.md",
-    "finalReleaseEvidence": "aarulya-app-store/docs/FINAL_RELEASE_EVIDENCE_REPORT.md"
+    "finalReleaseEvidence": "aarulya-app-store/docs/FINAL_RELEASE_EVIDENCE_REPORT.md",
+    "physicalDevice": "aarulya-app-store/docs/PHYSICAL_DEVICE_ACCEPTANCE.md",
+    "devicePreflight": "aarulya-app-store/deploy/verify-device-acceptance.sh",
+    "internationalCountryPack": "aarulya-app-store/docs/INTERNATIONAL_COUNTRY_PACK_FRAMEWORK.md",
+    "internationalCountryPackManifest": "aarulya-app-store/market-packs/international-baseline.v1.json"
   },
   "ciEvidenceBoundary": {
     "exactHeadWorkflow": "Aarulya Store end-to-end source verification",

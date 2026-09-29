@@ -242,3 +242,27 @@ test('commercial readiness distinguishes proven CI gates from external execution
     assert.ok(path.length > 0);
   }
 });
+
+
+test('remaining external gates have fail-closed source frameworks without launch approval', async () => {
+  const manifest = JSON.parse(await readFile(new URL('../../../commercial-readiness/product-readiness.v1.json', import.meta.url), 'utf8'));
+  const countryPack = JSON.parse(await store('market-packs/international-baseline.v1.json'));
+  const devicePreflight = await store('deploy/verify-device-acceptance.sh');
+
+  assert.equal(manifest.distributionSafety.physicalDeviceAcceptance, 'PARTIAL');
+  assert.equal(manifest.gates.internationalCountryPack, 'PARTIAL');
+  assert.equal(manifest.markets.international.countryPack, 'PARTIAL');
+  assert.equal(manifest.markets.international.state, 'BLOCKED');
+  assert.equal(manifest.launchFlags.internationalCommercial, false);
+  assert.equal(manifest.launchFlags.publicProduction, false);
+
+  assert.equal(countryPack.state, 'FRAMEWORK_ONLY');
+  assert.equal(countryPack.launchApproved, false);
+  assert.equal(countryPack.defaultCountryState, 'BLOCKED');
+  assert.deepEqual(countryPack.approvedCountries, []);
+
+  assert.match(devicePreflight, /AARULYA_DEVICE_SERIAL-required/);
+  assert.match(devicePreflight, /apk-sha256-mismatch/);
+  assert.match(devicePreflight, /INSTALL_EXECUTED=false/);
+  assert.doesNotMatch(devicePreflight, /adb[^\n]*install/);
+});

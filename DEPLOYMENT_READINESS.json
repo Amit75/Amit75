@@ -28,7 +28,9 @@
     "containsSigningKeys": false,
     "centralOperation": "Authenticated catalog and aggregate release status APIs only",
     "productionPreflight": "aarulya-app-store/deploy/verify-production-preflight.sh",
-    "productionPreflightMode": "read-only-fail-closed"
+    "productionPreflightMode": "read-only-fail-closed",
+    "deviceAcceptancePreflight": "aarulya-app-store/deploy/verify-device-acceptance.sh",
+    "internationalCountryPackFramework": "aarulya-app-store/market-packs/international-baseline.v1.json"
   },
   "claimBoundary": "Aarulya Store is not production-ready and no signed public release is claimed until every gate has current exact-head evidence.",
   "completedSourceGates": [
