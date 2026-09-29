@@ -238,10 +238,12 @@ function openApp(appId) {
   $('#detailAge').textContent = app.age;
 
   const download = $('#downloadButton');
-  const available = app.status === 'published' && INSTALL_APP_ID.test(app.id);
-  download.disabled = !available;
-  download.dataset.appId = available ? app.id : '';
-  download.textContent = available ? 'Aarulya Store app में खोलें' : 'Release अभी उपलब्ध नहीं';
+  const handoffAvailable = INSTALL_APP_ID.test(app.id);
+  download.disabled = !handoffAvailable;
+  download.dataset.appId = handoffAvailable ? app.id : '';
+  download.textContent = app.id === 'aarulya-store'
+    ? 'Aarulya Store install करें'
+    : 'Aarulya Store में देखें';
   $('#appDialog').showModal();
 }
 
