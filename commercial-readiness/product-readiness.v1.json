@@ -29,8 +29,14 @@
     ]
   },
   "markets": {
-    "india": { "state": "BLOCKED", "countryPack": "PARTIAL" },
-    "international": { "state": "BLOCKED", "countryPack": "MISSING" }
+    "india": {
+      "state": "BLOCKED",
+      "countryPack": "PARTIAL"
+    },
+    "international": {
+      "state": "BLOCKED",
+      "countryPack": "MISSING"
+    }
   },
   "launchFlags": {
     "indiaCommercial": false,
@@ -47,9 +53,9 @@
     "backupRestore": "PARTIAL",
     "rollback": "PARTIAL",
     "privacyPack": "PARTIAL",
-    "legalTerms": "MISSING",
-    "pricingBilling": "MISSING",
-    "supportSLA": "MISSING",
+    "legalTerms": "PARTIAL",
+    "pricingBilling": "PARTIAL",
+    "supportSLA": "PARTIAL",
     "customerPilot": "MISSING",
     "indiaCountryPack": "PARTIAL",
     "internationalCountryPack": "MISSING"
@@ -108,5 +114,17 @@
     "keyCompromiseRecovery": "MISSING",
     "disasterRecovery": "PARTIAL",
     "finalSignedEvidence": "MISSING"
+  },
+  "sourcePolicyPack": {
+    "activationState": "PRELAUNCH_DRAFT",
+    "requiresLegalReview": true,
+    "requiresVerifiedOperatorIdentity": true,
+    "requiresEffectiveDate": true,
+    "paths": {
+      "privacy": "aarulya-app-store/policies/privacy.html",
+      "terms": "aarulya-app-store/policies/terms.html",
+      "support": "aarulya-app-store/policies/support.html",
+      "pricing": "aarulya-app-store/policies/pricing.html"
+    }
   }
 }
