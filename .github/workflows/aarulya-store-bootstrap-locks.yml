@@ -202,7 +202,7 @@ jobs:
             echo 'Reproducibility files are already current.'
             exit 0
           fi
-          # Gradle's generated Windows wrapper intentionally uses CRLF. Check every
+          # Gradle's generated Windows wrapper intentionally uses canonical CRLF. Check every
           # generated source/metadata file for whitespace errors without treating
           # the standard batch-file line endings as trailing whitespace.
           git diff --cached --check -- . ':(exclude)aarulya-app-store/android-store/gradlew.bat'
