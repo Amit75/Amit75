@@ -17,6 +17,13 @@ class RemoteCatalogRepository(private val api: StoreApiClient = StoreApiClient()
                     "non-aarulya-package-rejected"
                 }
                 val status = item.optString("status", "unknown")
+                val latestVersionCode = item.optLong("latestVersionCode", 0L).takeIf { it > 0L }
+                val apkSizeBytes = item.optLong("apkSizeBytes", 0L).takeIf { it > 0L }
+                val evidenceStatus = item.optString("evidenceStatus", "not-published")
+                val releaseAvailable =
+                    status == "published" &&
+                        latestVersionCode != null &&
+                        evidenceStatus == "release-envelope-required-at-download"
                 add(
                     StoreApp(
                         id = id,
@@ -25,16 +32,16 @@ class RemoteCatalogRepository(private val api: StoreApiClient = StoreApiClient()
                         summary = item.optString("description", "Aarulya application"),
                         packageId = packageId,
                         ageLabel = item.optString("age", "Not rated"),
-                        sizeLabel = "Release size pending verification",
-                        trustLabel = if (status == "published") {
-                            "Published record; release proof checked at download"
+                        sizeLabel = apkSizeBytes?.let(::formatBytes) ?: "Release size pending verification",
+                        trustLabel = if (releaseAvailable) {
+                            "Published safe release; cryptographic proof is rechecked at download"
                         } else {
                             "No verified public release"
                         },
                         statusLabel = status,
                         featured = false,
-                        versionCode = null,
-                        verifiedReleaseAvailable = false,
+                        versionCode = latestVersionCode,
+                        verifiedReleaseAvailable = releaseAvailable,
                         source = "authenticated-api"
                     )
                 )
@@ -42,5 +49,12 @@ class RemoteCatalogRepository(private val api: StoreApiClient = StoreApiClient()
         }
         StoreCatalog.replaceAuthenticatedRemoteCatalog(result)
         return result
+    }
+
+    private fun formatBytes(bytes: Long): String = when {
+        bytes >= 1024L * 1024L * 1024L -> String.format("%.1f GB", bytes.toDouble() / (1024L * 1024L * 1024L))
+        bytes >= 1024L * 1024L -> String.format("%.1f MB", bytes.toDouble() / (1024L * 1024L))
+        bytes >= 1024L -> String.format("%.1f KB", bytes.toDouble() / 1024L)
+        else -> "$bytes B"
     }
 }
