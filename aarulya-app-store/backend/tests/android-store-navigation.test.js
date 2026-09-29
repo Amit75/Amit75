@@ -47,12 +47,22 @@ test('Android build keeps storefront, API, downloads and evidence on isolated or
   const build = await source('app/build.gradle.kts');
 
   assert.match(build, /https:\/\/store\.aarulya\.com/);
-  assert.match(build, /https:\/\/api\.store\.aarulya\.com\/v1/);
+  assert.match(build, /https:\/\/api\.store\.aarulya\.com\/api\/v1/);
   assert.match(build, /https:\/\/downloads\.store\.aarulya\.com/);
   assert.match(build, /https:\/\/evidence\.store\.aarulya\.com/);
   assert.match(build, /isDebuggable = false/);
   assert.match(build, /isMinifyEnabled = true/);
   assert.match(build, /warningsAsErrors = true/);
+});
+
+test('authenticated remote catalog enables only verified published releases', async () => {
+  const remote = await source('app/src/main/java/com/aarulya/store/catalog/RemoteCatalogRepository.kt');
+
+  assert.match(remote, /latestVersionCode/);
+  assert.match(remote, /apkSizeBytes/);
+  assert.match(remote, /evidenceStatus == "release-envelope-required-at-download"/);
+  assert.match(remote, /verifiedReleaseAvailable = releaseAvailable/);
+  assert.match(remote, /status == "published"/);
 });
 
 test('Aarulya logo, adaptive icon and clean theme are applied consistently', async () => {
