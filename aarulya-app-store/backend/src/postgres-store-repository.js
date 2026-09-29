@@ -119,6 +119,7 @@ const VALID_PUBLISHED_RELEASE = `
       AND envelope.signature_verification = 'passed'
       AND envelope.transparency_inclusion = 'verified'
       AND envelope.expires_at > now()
+      AND key.purpose = 'release-manifest'
       AND key.state IN ('active', 'retiring')
       AND now() BETWEEN key.not_before AND key.not_after
   )
@@ -269,6 +270,7 @@ export class PostgreSqlStoreRepository {
          ON key.key_id = manifest.signing_key_id
        WHERE head.singleton = true
          AND manifest.expires_at > now()
+         AND key.purpose = 'catalog'
          AND key.state IN ('active', 'retiring')
          AND now() BETWEEN key.not_before AND key.not_after
        LIMIT 1`
