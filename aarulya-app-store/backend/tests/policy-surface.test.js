@@ -32,6 +32,11 @@ test('storefront exposes a fail-closed pre-launch policy pack', () => {
   assert.match(terms, /silent installation is not provided/i);
   assert.match(support, /No contractual SLA is active/i);
   assert.match(pricing, /no live payment collection/i);
+  const compose = read('../../deploy/compose.production.yml');
+  assert.ok(
+    compose.includes('../policies:/srv/storefront/policies:ro'),
+    'production composition must serve the policy pack from a read-only mount'
+  );
 });
 
 test('commercial readiness records policy source as partial, never as launch approval', () => {

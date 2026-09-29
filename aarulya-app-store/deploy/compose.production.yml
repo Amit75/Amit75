@@ -162,6 +162,7 @@ services:
       - ../assets:/srv/storefront/assets:ro
       - ../src:/srv/storefront/src:ro
       - ../install:/srv/storefront/install:ro
+      - ../policies:/srv/storefront/policies:ro
       - caddy_data:/data
       - caddy_config:/config
 
