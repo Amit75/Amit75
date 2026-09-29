@@ -36,6 +36,8 @@ test('production API cannot start with stub authentication or shared publication
   assert.match(http, /store:download/);
   assert.match(http, /store:install/);
   assert.match(http, /store:release:publish/);
+  assert.match(http, /store:release:rollback/);
+  assert.match(http, /selectSafeVersion/);
   assert.match(http, /stepUp: true/);
 });
 
@@ -46,6 +48,7 @@ test('database and release migrations require immutable signed evidence and isol
   const approvals = await backend('sql/0008_release_approvals_and_risk_tiers.sql');
   const receipts = await backend('sql/0009_publication_receipts.sql');
   const hardening = await backend('sql/0010_runtime_identity_hardening.sql');
+  const safeReceipts = await backend('sql/0013_safe_version_change_receipts.sql');
   const roles = await backend('bootstrap/roles.sql');
 
   assert.match(core, /ENABLE ROW LEVEL SECURITY/);
@@ -65,7 +68,10 @@ test('database and release migrations require immutable signed evidence and isol
   assert.match(roles, /aarulya_store_publisher/);
   assert.match(hardening, /session_user/);
   assert.match(hardening, /GRANT UPDATE \(status, published_at\) ON app_versions TO aarulya_store_publisher/);
+  assert.match(hardening, /UPDATE \(app_version_id, selected_by, selected_at\) ON safe_versions/);
   assert.match(hardening, /REVOKE ALL ON ALL SEQUENCES IN SCHEMA aarulya_store/);
+  assert.match(safeReceipts, /safe_version_change_receipts_immutable/);
+  assert.match(safeReceipts, /GRANT SELECT, INSERT ON safe_version_change_receipts TO aarulya_store_publisher/);
 });
 
 test('catalog, downloads and updates follow the explicit safe-version pointer', async () => {
