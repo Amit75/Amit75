@@ -97,9 +97,28 @@ async function streamFile(response, path, metadata, cacheControl) {
     'cache-control': cacheControl,
     'x-aarulya-sha256': actualDigest,
     ...(metadata.packageId ? { 'x-aarulya-package-id': metadata.packageId } : {}),
-    ...(metadata.versionCode ? { 'x-aarulya-version-code': String(metadata.versionCode) } : {})
+    ...(metadata.versionCode ? { 'x-aarulya-version-code': String(metadata.versionCode) } : {}),
+    ...(metadata.signerFingerprint ? { 'x-aarulya-signer-sha256': String(metadata.signerFingerprint).replaceAll(':', '').toLowerCase() } : {}),
+    ...(metadata.evidenceReportSha256 ? { 'x-aarulya-evidence-sha256': metadata.evidenceReportSha256 } : {})
   }));
   createReadStream(path).pipe(response);
+}
+
+async function handleStoreBootstrap(request, response, pathname) {
+  if (pathname !== '/v1/bootstrap/aarulya-store.apk' || request.method !== 'GET') return false;
+  const release = await artifactRepository.getStoreBootstrapRelease();
+  const path = safePath(release.objectKey);
+  await streamFile(response, path, {
+    sha256: release.apkSha256,
+    expectedSize: release.apkSizeBytes,
+    contentType: 'application/vnd.android.package-archive',
+    filename: `Aarulya-Store-${release.versionCode}.apk`,
+    packageId: release.packageId,
+    versionCode: release.versionCode,
+    signerFingerprint: release.signerFingerprint,
+    evidenceReportSha256: release.evidenceReportSha256
+  }, 'no-store');
+  return true;
 }
 
 async function handleDownload(request, response, pathname) {
@@ -141,7 +160,7 @@ const server = createServer(async (request, response) => {
       return json(response, 200, { status: 'ok', service: `aarulya-store-${mode}` });
     }
     const handled = downloadsMode
-      ? await handleDownload(request, response, url.pathname)
+      ? (await handleStoreBootstrap(request, response, url.pathname) || await handleDownload(request, response, url.pathname))
       : await handleEvidence(request, response, url.pathname);
     if (!handled) json(response, 404, { error: 'artifact-not-found' });
   } catch (error) {
