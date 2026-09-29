@@ -24,11 +24,13 @@ const [
   readFile(new URL('../../../.github/workflows/aarulya-store-verify.yml', import.meta.url), 'utf8'),
 ]);
 
-test('web catalog hands published installs to the canonical Store app-link only', () => {
+test('web catalog hands every valid listing to the canonical Store app-link only', () => {
   assert.match(webApp, /https:\/\/store\.aarulya\.com\/install/u);
   assert.match(webApp, /searchParams\.set\('app', appId\)/u);
-  assert.match(webApp, /Aarulya Store app में खोलें/u);
+  assert.match(webApp, /Aarulya Store में देखें/u);
+  assert.match(webApp, /app\.id === 'aarulya-store'/u);
   assert.doesNotMatch(webApp, /window\.location\.(?:assign|href)\s*\(?\s*app\.apkUrl/u);
+  assert.doesNotMatch(webApp, /app\.status === 'published' && INSTALL_APP_ID/u);
   assert.doesNotMatch(webApp, /downloads\.store\.aarulya\.com/u);
 });
 
