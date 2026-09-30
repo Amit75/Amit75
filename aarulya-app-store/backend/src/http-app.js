@@ -86,6 +86,9 @@ function requireIdempotency(request) {
 }
 
 function requirementsFor(method, pathname) {
+  if (method === 'GET' && pathname === '/api/v1/account/overview') return { scopes: ['store:read'] };
+  if (method === 'POST' && pathname.startsWith('/api/v1/account/sessions/') && pathname.endsWith('/revoke')) return { scopes: ['store:read'] };
+  if (pathname === '/api/v1/developer/submissions' || pathname.startsWith('/api/v1/developer/submissions/')) return { scopes: ['store:read'] };
   if (method === 'POST' && pathname === '/api/v1/admin/releases/publish') {
     return { scopes: ['store:release:publish'], stepUp: true };
   }
@@ -175,6 +178,69 @@ export function createHttpHandler({
         expiresAt: identity.expiresAt,
         requestId
       });
+
+      if (method === 'GET' && pathname === '/api/v1/account/overview') {
+        return writeJson(response, 200,
+          await releaseRepository.getAccountOverview(context.actorId, context.sessionId),
+          requestId, acceptedOrigin);
+      }
+
+      const accountSessionParams = method === 'POST'
+        ? routeMatch(pathname, '/api/v1/account/sessions/:sessionId/revoke')
+        : null;
+      if (accountSessionParams) {
+        return writeJson(response, 200, await releaseRepository.revokeOwnedSession({
+          userId: context.actorId,
+          sessionId: accountSessionParams.sessionId
+        }), requestId, acceptedOrigin);
+      }
+
+      const hasDeveloperRole = () => (context.roles || []).some(
+        (role) => ['owner', 'developer', 'publisher'].includes(role)
+      );
+
+      if (method === 'GET' && pathname === '/api/v1/developer/submissions') {
+        if (!hasDeveloperRole()) {
+          const error = new Error('developer-role-required');
+          error.status = 403;
+          throw error;
+        }
+        return writeJson(response, 200, {
+          submissions: await releaseRepository.listDeveloperSubmissions(context.actorId)
+        }, requestId, acceptedOrigin);
+      }
+
+      if (method === 'POST' && pathname === '/api/v1/developer/submissions') {
+        if (!hasDeveloperRole()) {
+          const error = new Error('developer-role-required');
+          error.status = 403;
+          throw error;
+        }
+        const body = await readJson(request);
+        return writeJson(response, 201, await releaseRepository.createDeveloperSubmission({
+          userId: context.actorId,
+          appName: body.appName,
+          packageId: body.packageId,
+          category: body.category,
+          privacyPolicyUrl: body.privacyPolicyUrl,
+          ownershipEvidenceUrl: body.ownershipEvidenceUrl
+        }), requestId, acceptedOrigin);
+      }
+
+      const submitDeveloperParams = method === 'POST'
+        ? routeMatch(pathname, '/api/v1/developer/submissions/:submissionId/submit')
+        : null;
+      if (submitDeveloperParams) {
+        if (!hasDeveloperRole()) {
+          const error = new Error('developer-role-required');
+          error.status = 403;
+          throw error;
+        }
+        return writeJson(response, 200, await releaseRepository.submitDeveloperSubmission({
+          userId: context.actorId,
+          submissionId: submitDeveloperParams.submissionId
+        }), requestId, acceptedOrigin);
+      }
 
       if (method === 'POST' && pathname === '/api/v1/sessions/current/revoke') {
         const result = await releaseRepository.revokeCurrentSession({
