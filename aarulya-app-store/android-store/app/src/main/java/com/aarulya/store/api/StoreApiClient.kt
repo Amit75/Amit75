@@ -84,6 +84,25 @@ class StoreApiClient {
             .put("installedVersionCode", installedVersionCode)
     )
 
+    fun getAccountOverview(accessToken: String): JSONObject =
+        request(
+            "GET",
+            baseUri.buildUpon().appendPath("account").appendPath("overview").build(),
+            accessToken
+        )
+
+    fun revokeAccountSession(accessToken: String, sessionId: String): JSONObject =
+        request(
+            "POST",
+            baseUri.buildUpon()
+                .appendPath("account")
+                .appendPath("sessions")
+                .appendPath(sessionId)
+                .appendPath("revoke")
+                .build(),
+            accessToken
+        )
+
     fun revokeCurrentSession(accessToken: String): JSONObject =
         request(
             "POST",
