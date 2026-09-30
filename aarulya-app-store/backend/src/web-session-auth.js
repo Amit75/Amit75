@@ -277,6 +277,29 @@ export function createWebAuthHandler({
         });
       }
 
+      if (method === 'GET' && url.pathname === '/auth/account/export') {
+        const session = codec.open(cookies[SESSION_COOKIE]);
+        const identity = await verifiedIdentity(session);
+        return writeJson(response, 200,
+          await storeRepository.getAccountExport(identity.actorId, identity.sessionId));
+      }
+
+      if (method === 'POST' && url.pathname === '/auth/account/deletion/request') {
+        requireSameOriginMutation(request);
+        const session = codec.open(cookies[SESSION_COOKIE]);
+        const identity = await verifiedIdentity(session);
+        if (identity.stepUpVerified !== true) throw webError('step-up-authentication-required', 403);
+        return writeJson(response, 201, await storeRepository.requestAccountDeletion(identity.actorId));
+      }
+
+      if (method === 'POST' && url.pathname === '/auth/account/deletion/cancel') {
+        requireSameOriginMutation(request);
+        const session = codec.open(cookies[SESSION_COOKIE]);
+        const identity = await verifiedIdentity(session);
+        if (identity.stepUpVerified !== true) throw webError('step-up-authentication-required', 403);
+        return writeJson(response, 200, await storeRepository.cancelAccountDeletion(identity.actorId));
+      }
+
       if (method === 'GET' && url.pathname === '/auth/account/overview') {
         const session = codec.open(cookies[SESSION_COOKIE]);
         const identity = await verifiedIdentity(session);
