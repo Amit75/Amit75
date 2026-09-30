@@ -87,6 +87,11 @@ function requireIdempotency(request) {
 
 function requirementsFor(method, pathname) {
   if (method === 'GET' && pathname === '/api/v1/account/overview') return { scopes: ['store:read'] };
+  if (method === 'GET' && pathname === '/api/v1/account/export') return { scopes: ['store:read'] };
+  if (method === 'POST' && (pathname === '/api/v1/account/deletion/request' || pathname === '/api/v1/account/deletion/cancel')) {
+    return { scopes: ['store:read'], stepUp: true };
+  }
+
   if (method === 'POST' && pathname.startsWith('/api/v1/account/sessions/') && pathname.endsWith('/revoke')) return { scopes: ['store:read'] };
   if (pathname === '/api/v1/developer/submissions' || pathname.startsWith('/api/v1/developer/submissions/')) return { scopes: ['store:read'] };
   if (method === 'POST' && pathname === '/api/v1/admin/releases/publish') {
@@ -178,6 +183,34 @@ export function createHttpHandler({
         expiresAt: identity.expiresAt,
         requestId
       });
+
+      if (method === 'GET' && pathname === '/api/v1/account/export') {
+        return writeJson(response, 200,
+          await releaseRepository.getAccountExport(context.actorId, context.sessionId),
+          requestId, acceptedOrigin);
+      }
+
+      if (method === 'POST' && pathname === '/api/v1/account/deletion/request') {
+        if (context.stepUpVerified !== true) {
+          const error = new Error('step-up-authentication-required');
+          error.status = 403;
+          throw error;
+        }
+        return writeJson(response, 201,
+          await releaseRepository.requestAccountDeletion(context.actorId),
+          requestId, acceptedOrigin);
+      }
+
+      if (method === 'POST' && pathname === '/api/v1/account/deletion/cancel') {
+        if (context.stepUpVerified !== true) {
+          const error = new Error('step-up-authentication-required');
+          error.status = 403;
+          throw error;
+        }
+        return writeJson(response, 200,
+          await releaseRepository.cancelAccountDeletion(context.actorId),
+          requestId, acceptedOrigin);
+      }
 
       if (method === 'GET' && pathname === '/api/v1/account/overview') {
         return writeJson(response, 200,
