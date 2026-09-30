@@ -5,7 +5,7 @@ import process from 'node:process';
 
 const SHA40=/^[a-f0-9]{40}$/;
 const DIGEST=/^sha256:[a-f0-9]{64}$/;
-const IMAGE=/^[a-z0-9][a-z0-9._/-]*(?::[a-z0-9._-]+)?@sha256:[a-f0-9]{64}$/i;
+const IMAGE=/^(?:sha256:[a-f0-9]{64}|[a-z0-9][a-z0-9._/-]*(?::[a-z0-9._-]+)?@sha256:[a-f0-9]{64})$/i;
 const ID=/^[A-Za-z0-9._:-]{3,128}$/;
 
 function required(name) {
@@ -29,7 +29,7 @@ function image(name) {
   return value;
 }
 function imageDigest(value) {
-  return value.slice(value.lastIndexOf('@')+1);
+  return value.startsWith('sha256:') ? value : value.slice(value.lastIndexOf('@')+1);
 }
 function git(repoRoot,...args) {
   return execFileSync('git',['-C',repoRoot,...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
