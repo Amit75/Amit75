@@ -30,6 +30,7 @@ const apiHandler = createHttpHandler({
 });
 const webAuthHandler = createWebAuthHandler({
   authenticate: composition.authenticate,
+  storeRepository: composition.storeRepository,
   revokeCurrentSession: (identity) => composition.storeRepository.revokeCurrentSession({
     sessionId: identity.sessionId,
     subject: identity.externalSubject,
