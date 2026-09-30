@@ -41,3 +41,14 @@ test('staging backend image includes storefront assets and private edge entrypoi
   assert.match(edge,/static-path-escape-denied/);
   assert.match(edge,/redirect: 'manual'/);
 });
+
+
+test('staging image builder requires exact clean source and rootless immutable image identity', async () => {
+  const builder = await source('deploy/build-cloud-staging-image.sh');
+  assert.match(builder, /rootless-build-required/);
+  assert.match(builder, /exact-source-head-mismatch/);
+  assert.match(builder, /tracked-source-not-clean/);
+  assert.match(builder, /org\.opencontainers\.image\.revision/);
+  assert.match(builder, /IMAGE_ID=.*sha256/);
+  assert.match(builder, /PRODUCTION_DEPLOYED=false/);
+});
