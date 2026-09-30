@@ -49,6 +49,6 @@ test('staging image builder requires exact clean source and rootless immutable i
   assert.match(builder, /exact-source-head-mismatch/);
   assert.match(builder, /tracked-source-not-clean/);
   assert.match(builder, /org\.opencontainers\.image\.revision/);
-  assert.match(builder, /IMAGE_ID=.*sha256/);
+  assert.match(builder, /IMAGE_ID.*\^sha256:/);
   assert.match(builder, /PRODUCTION_DEPLOYED=false/);
 });
