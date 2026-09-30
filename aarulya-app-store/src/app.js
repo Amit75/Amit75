@@ -152,7 +152,6 @@ function renderCategories() {
       selectedCategory = button.dataset.category;
       renderCategories();
       renderAllApps();
-bindAccountUi();
       scrollToElement($('#allAppsSection'));
     });
   });
@@ -273,3 +272,4 @@ renderFeatured();
 renderCategories();
 renderShelves();
 renderAllApps();
+bindAccountUi();
