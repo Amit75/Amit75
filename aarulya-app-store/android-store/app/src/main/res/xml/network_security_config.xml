@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">store.aarulya.com</domain>
+        <domain includeSubdomains="false">api.store.aarulya.com</domain>
+        <domain includeSubdomains="false">downloads.store.aarulya.com</domain>
+        <domain includeSubdomains="false">evidence.store.aarulya.com</domain>
+        <domain includeSubdomains="false">identity.aarulya.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

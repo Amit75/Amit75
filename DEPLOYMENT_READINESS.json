@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "projectId": "aarulya-store",
+  "projectName": "Aarulya Store",
+  "repository": "Amit75/Amit75",
+  "authoritativeBranch": "agent/aarulya-app-store-foundation",
+  "pullRequest": 2,
+  "owner": "Amit Kumar",
+  "status": "SOURCE_ACCEPTANCE_GREEN_EXTERNAL_RELEASE_GATES_PENDING",
+  "productionDeployed": false,
+  "gates": [
+    "exact-head source identity",
+    "locked dependency install and audits",
+    "database migration and role acceptance",
+    "identity and owner publication authorization",
+    "Android build and release envelope verification",
+    "offline signing and certificate continuity",
+    "independent rebuild and malware assessment",
+    "physical-device installation and update acceptance",
+    "DNS TLS download and evidence service acceptance",
+    "backup restore monitoring and rollback",
+    "owner approval bound to exact release SHA"
+  ],
+  "handoff": {
+    "generator": "scripts/create-owner-handoff.sh",
+    "format": "checksum-bound tar.gz",
+    "containsSecrets": false,
+    "containsSigningKeys": false,
+    "centralOperation": "Authenticated catalog and aggregate release status APIs only",
+    "productionPreflight": "aarulya-app-store/deploy/verify-production-preflight.sh",
+    "productionPreflightMode": "read-only-fail-closed",
+    "deviceAcceptancePreflight": "aarulya-app-store/deploy/verify-device-acceptance.sh",
+    "internationalCountryPackFramework": "aarulya-app-store/market-packs/international-baseline.v1.json"
+  },
+  "claimBoundary": "Aarulya Store is not production-ready and no signed public release is claimed until every gate has current exact-head evidence.",
+  "completedSourceGates": [
+    "exact-head source identity",
+    "locked dependency install and audits",
+    "database migration and role acceptance",
+    "Android locked build and CI test-signature verification",
+    "production composition source validation",
+    "fail-closed commercial readiness validation"
+  ],
+  "pendingExternalGates": [
+    "identity and owner publication authorization",
+    "isolated staging execution",
+    "offline production signing and certificate continuity",
+    "independent rebuild execution",
+    "malware and security assessment execution",
+    "penetration and reverse-engineering assessment",
+    "physical-device installation and update acceptance",
+    "DNS TLS download and evidence service acceptance",
+    "backup restore monitoring and rollback drill",
+    "controlled customer pilot",
+    "owner approval bound to exact final release SHA"
+  ]
+}

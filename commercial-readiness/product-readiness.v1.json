@@ -1,0 +1,150 @@
+{
+  "schemaVersion": "1.0.0",
+  "productId": "aarulya-store",
+  "productName": "Aarulya Store",
+  "productRole": "first-party-android-catalog-release-envelope-distribution-and-publication-receipt-system-of-record",
+  "commercialPriority": 10,
+  "aiEnabled": false,
+  "revenueModels": [
+    "first-party-app-distribution",
+    "enterprise-private-store",
+    "managed-release-service",
+    "implementation",
+    "support"
+  ],
+  "boundary": {
+    "owns": [
+      "first-party-app-catalog",
+      "signed-version-and-release-envelope-metadata",
+      "apk-download-and-install-receipts",
+      "update-check-and-safe-version-pointers",
+      "owner-gated-publication-evidence"
+    ],
+    "mustNotOwn": [
+      "third-party-apk-import-modification-or-resigning",
+      "application-feature-source-code",
+      "payment-custody-or-settlement",
+      "company-revenue-ledger",
+      "public-release-signing-private-keys"
+    ]
+  },
+  "markets": {
+    "india": {
+      "state": "BLOCKED",
+      "countryPack": "PARTIAL"
+    },
+    "international": {
+      "state": "BLOCKED",
+      "countryPack": "PARTIAL"
+    }
+  },
+  "launchFlags": {
+    "indiaCommercial": false,
+    "internationalCommercial": false,
+    "livePayments": false,
+    "liveProviders": false,
+    "publicProduction": false
+  },
+  "gates": {
+    "exactHeadCI": "PASS",
+    "dependencyAudit": "PASS",
+    "securityReview": "PARTIAL",
+    "stagingDeployment": "PARTIAL",
+    "backupRestore": "PARTIAL",
+    "rollback": "PARTIAL",
+    "privacyPack": "PARTIAL",
+    "legalTerms": "PARTIAL",
+    "pricingBilling": "PARTIAL",
+    "supportSLA": "PARTIAL",
+    "customerPilot": "PARTIAL",
+    "indiaCountryPack": "PARTIAL",
+    "internationalCountryPack": "PARTIAL"
+  },
+  "revenueTruth": {
+    "actualIncomeRequiresSettledEvidence": true,
+    "invoiceIsNotCash": true,
+    "contractIsNotCash": true,
+    "pipelineIsNotCash": true,
+    "estimatedRevenueIsNotCash": true
+  },
+  "dataGovernance": {
+    "dataCategories": [
+      "catalog-and-version-metadata",
+      "release-envelope-and-signature-reference-metadata",
+      "download-install-and-update-receipts",
+      "device-compatible-aggregate-telemetry",
+      "security-and-publication-evidence",
+      "support-and-audit-data"
+    ],
+    "defaultResidency": "owner-approved-region",
+    "crossBorderTransferDefault": "BLOCKED",
+    "retentionPolicyRequired": true,
+    "deletionAndExportWorkflowRequired": true
+  },
+  "aiGovernance": {
+    "disclosureRequired": true,
+    "modelIdentityEvidenceRequired": true,
+    "humanReviewRulesRequired": true,
+    "unsupportedClaimPublicationBlocked": true
+  },
+  "approval": {
+    "ownerApprovalRequired": true,
+    "legalProfessionalReviewRequiredForRegulatedMarkets": true,
+    "approvalEvidence": []
+  },
+  "distributionSafety": {
+    "firstPartyAarulyaAppsOnly": true,
+    "thirdPartyApkImportDenied": true,
+    "thirdPartyApkModificationDenied": true,
+    "thirdPartyApkResigningDenied": true,
+    "silentInstallDenied": true,
+    "androidUserConfirmationRequired": true,
+    "signingAuthorityOutsidePublicServices": true,
+    "signingMaterialOutsideRepository": true,
+    "packageVersionDigestAndCertificateContinuityRequired": true,
+    "v1SigningDisabled": true,
+    "v2AndV3SigningRequired": true,
+    "releaseEnvelopeKeyFingerprintPinningRequired": true,
+    "offlineSigningCeremony": "PARTIAL",
+    "androidBuild": "PASS",
+    "physicalDeviceAcceptance": "PARTIAL",
+    "independentRebuild": "PARTIAL",
+    "malwareAndSecurityTesting": "PARTIAL",
+    "penetrationAndReverseEngineeringAssessment": "PARTIAL",
+    "keyCompromiseRecovery": "PARTIAL",
+    "disasterRecovery": "PARTIAL",
+    "finalSignedEvidence": "PARTIAL"
+  },
+  "sourcePolicyPack": {
+    "activationState": "PRELAUNCH_DRAFT",
+    "requiresLegalReview": true,
+    "requiresVerifiedOperatorIdentity": true,
+    "requiresEffectiveDate": true,
+    "paths": {
+      "privacy": "aarulya-app-store/policies/privacy.html",
+      "terms": "aarulya-app-store/policies/terms.html",
+      "support": "aarulya-app-store/policies/support.html",
+      "pricing": "aarulya-app-store/policies/pricing.html"
+    }
+  },
+  "sourceAcceptanceControls": {
+    "staging": "aarulya-app-store/docs/STAGING_ACCEPTANCE.md",
+    "offlineSigning": "aarulya-app-store/docs/OFFLINE_SIGNING_CEREMONY.md",
+    "independentRebuild": "aarulya-app-store/docs/INDEPENDENT_REBUILD_ACCEPTANCE.md",
+    "malwareSecurity": "aarulya-app-store/docs/MALWARE_SECURITY_ACCEPTANCE.md",
+    "penetrationReverseEngineering": "aarulya-app-store/docs/PENETRATION_REVERSE_ENGINEERING_ACCEPTANCE.md",
+    "keyCompromiseRecovery": "aarulya-app-store/docs/KEY_COMPROMISE_RECOVERY.md",
+    "customerPilot": "aarulya-app-store/docs/CUSTOMER_PILOT_ACCEPTANCE.md",
+    "finalReleaseEvidence": "aarulya-app-store/docs/FINAL_RELEASE_EVIDENCE_REPORT.md",
+    "physicalDevice": "aarulya-app-store/docs/PHYSICAL_DEVICE_ACCEPTANCE.md",
+    "devicePreflight": "aarulya-app-store/deploy/verify-device-acceptance.sh",
+    "internationalCountryPack": "aarulya-app-store/docs/INTERNATIONAL_COUNTRY_PACK_FRAMEWORK.md",
+    "internationalCountryPackManifest": "aarulya-app-store/market-packs/international-baseline.v1.json"
+  },
+  "ciEvidenceBoundary": {
+    "exactHeadWorkflow": "Aarulya Store end-to-end source verification",
+    "commercialReadinessWorkflow": "Commercial Readiness Radar",
+    "currentBranchMustRemainGreen": true,
+    "ciTestApkIsProductionSigned": false
+  }
+}
