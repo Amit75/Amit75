@@ -79,6 +79,15 @@ const statusLabels = {
 
 let selectedCategory = 'All';
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function iconFor(app) {
   return icons[app.id] || app.name.slice(0, 1).toUpperCase();
 }
@@ -87,21 +96,21 @@ function iconMarkup(app) {
   if (app.packageId === 'com.aarulya.store') {
     return '<img src="assets/aarulya-store-mark.svg" alt="" aria-hidden="true" width="64" height="64">';
   }
-  return `<span aria-hidden="true">${iconFor(app)}</span>`;
+  return `<span aria-hidden="true">${escapeHtml(iconFor(app))}</span>`;
 }
 
 function appCard(app, compact = false) {
   const available = app.status === 'published';
   return `
-    <article class="app-card ${compact ? 'compact' : ''}" data-app-card="${app.id}" tabindex="0" role="button" aria-label="${app.name} details">
+    <article class="app-card ${compact ? 'compact' : ''}" data-app-card="${escapeHtml(app.id)}" tabindex="0" role="button" aria-label="${escapeHtml(app.name)} details">
       <div class="app-icon">${iconMarkup(app)}</div>
       <div class="app-info">
-        <span class="status ${app.status}">${statusLabels[app.status] || app.status}</span>
-        <h3>${app.name}</h3>
-        <p>${app.description}</p>
-        <div class="app-meta"><span>${app.category}</span><span>${app.age}</span></div>
+        <span class="status ${escapeHtml(app.status)}">${escapeHtml(statusLabels[app.status] || app.status)}</span>
+        <h3>${escapeHtml(app.name)}</h3>
+        <p>${escapeHtml(app.description)}</p>
+        <div class="app-meta"><span>${escapeHtml(app.category)}</span><span>${escapeHtml(app.age)}</span></div>
       </div>
-      <button class="card-action" type="button" data-open-app="${app.id}">${available ? 'Get' : 'Details'}</button>
+      <button class="card-action" type="button" data-open-app="${escapeHtml(app.id)}">${available ? 'Get' : 'Details'}</button>
     </article>`;
 }
 
@@ -127,13 +136,13 @@ function renderFeatured() {
   const featured = STOREFRONT_SHELVES.find((shelf) => shelf.id === 'featured');
   const apps = featured.appIds.map((id) => APPS_BY_ID.get(id)).filter(Boolean);
   $('#featuredGrid').innerHTML = apps.map((app, index) => `
-    <article class="feature-card feature-${index + 1}" data-app-card="${app.id}" tabindex="0" role="button" aria-label="${app.name} details">
+    <article class="feature-card feature-${index + 1}" data-app-card="${escapeHtml(app.id)}" tabindex="0" role="button" aria-label="${escapeHtml(app.name)} details">
       <div class="feature-icon">${iconMarkup(app)}</div>
       <div>
-        <p class="eyebrow">${app.category}</p>
-        <h3>${app.name}</h3>
-        <p>${app.description}</p>
-        <span class="feature-status">${statusLabels[app.status] || app.status}</span>
+        <p class="eyebrow">${escapeHtml(app.category)}</p>
+        <h3>${escapeHtml(app.name)}</h3>
+        <p>${escapeHtml(app.description)}</p>
+        <span class="feature-status">${escapeHtml(statusLabels[app.status] || app.status)}</span>
       </div>
     </article>`).join('');
   bindAppCards($('#featuredGrid'));
@@ -145,7 +154,7 @@ function scrollToElement(element) {
 
 function renderCategories() {
   $('#categoryChips').innerHTML = CATEGORIES.map((category) => `
-    <button type="button" class="chip ${category === selectedCategory ? 'active' : ''}" data-category="${category}">${category}</button>`).join('');
+    <button type="button" class="chip ${category === selectedCategory ? 'active' : ''}" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>`).join('');
 
   $$('[data-category]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -165,8 +174,8 @@ function renderShelves() {
     return `
       <section class="shelf" data-shelf="${shelf.id}">
         <div class="section-head">
-          <div><p class="eyebrow">CURATED</p><h2>${shelf.title}</h2><p class="section-subtitle">${shelf.subtitle}</p></div>
-          <button type="button" class="text-button" data-show-shelf="${shelf.id}">सभी देखें</button>
+          <div><p class="eyebrow">CURATED</p><h2>${escapeHtml(shelf.title)}</h2><p class="section-subtitle">${escapeHtml(shelf.subtitle)}</p></div>
+          <button type="button" class="text-button" data-show-shelf="${escapeHtml(shelf.id)}">सभी देखें</button>
         </div>
         <div class="shelf-row">${apps.map((app) => appCard(app, true)).join('')}</div>
       </section>`;
