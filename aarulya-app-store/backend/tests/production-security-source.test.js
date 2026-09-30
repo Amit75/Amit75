@@ -318,3 +318,26 @@ test('account history and developer portal remain owner-scoped and review-gated'
   assert.match(account, /Submit for review/);
   assert.doesNotMatch(account, /access_token|Authorization:\s*Bearer/i);
 });
+
+
+test('privacy workflow exports bounded account data and never silently deletes users', async () => {
+  const migration = await backend('sql/0016_account_privacy_workflow.sql');
+  const repository = await backend('src/postgres-store-repository.js');
+  const http = await backend('src/http-app.js');
+  const webAuth = await backend('src/web-session-auth.js');
+  const account = await store('src/account.js');
+
+  assert.match(migration, /CREATE TABLE account_privacy_requests/);
+  assert.match(migration, /request_account_deletion/);
+  assert.match(migration, /cancel_account_deletion_request/);
+  assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
+  assert.doesNotMatch(migration, /DELETE\s+FROM\s+users/i);
+  assert.match(repository, /getAccountExport/);
+  assert.match(repository, /requestAccountDeletion/);
+  assert.match(repository, /cancelAccountDeletion/);
+  assert.match(http, /account\/deletion\/request/);
+  assert.match(http, /stepUp: true/);
+  assert.match(webAuth, /step-up-authentication-required/);
+  assert.match(account, /aarulya-store-account-export\.json/);
+  assert.match(account, /Request account deletion|deletion\/request/);
+});
