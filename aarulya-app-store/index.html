@@ -125,6 +125,15 @@
         <div><span>Install history</span><strong id="accountInstalls">Sign in to load</strong></div>
       </div>
       <div id="accountSessionList" class="account-list" aria-live="polite"></div>
+      <section class="privacy-controls" aria-label="Account privacy controls">
+        <strong>Privacy controls</strong>
+        <p id="accountPrivacyState">No active deletion request.</p>
+        <div class="privacy-actions">
+          <button id="accountExportButton" type="button">Download my data</button>
+          <button id="accountDeletionButton" type="button">Request account deletion</button>
+          <button id="accountDeletionCancel" type="button" hidden>Cancel deletion request</button>
+        </div>
+      </section>
       <p>Password, OTP और bearer token storefront JavaScript में store नहीं होते। Web session Secure, HttpOnly, SameSite cookie से bound रहती है।</p>
       <button id="accountPrimary" class="primary" type="button">Sign in securely</button>
     </article>
