@@ -24,11 +24,13 @@ import android.widget.TextView
 import com.aarulya.store.R
 import com.aarulya.store.catalog.StoreApp
 import com.aarulya.store.catalog.StoreCatalog
+import org.json.JSONObject
 
 class StoreHomeView(
     private val context: Context,
     private val onAppSelected: (StoreApp) -> Unit,
     private val sessionExpiresAtEpochSeconds: Long,
+    private val accountOverview: JSONObject?,
     private val onSignOut: () -> Unit
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -307,9 +309,13 @@ class StoreHomeView(
     private fun renderAccountState() {
         content.addView(sectionTitle("You"))
         val remainingMinutes = ((sessionExpiresAtEpochSeconds - System.currentTimeMillis() / 1000L) / 60L).coerceAtLeast(0L)
+        val devices = accountOverview?.optJSONArray("devices")?.length() ?: 0
+        val sessions = accountOverview?.optJSONArray("sessions")?.length() ?: 0
+        val installs = accountOverview?.optJSONArray("installs")?.length() ?: 0
+        val updates = accountOverview?.optJSONArray("updates")?.length() ?: 0
         content.addView(infoCard(
             "Verified account",
-            "Downloads, devices, update history and privacy controls stay bound to this encrypted session. Approximate session time remaining: ${remainingMinutes} min."
+            "Encrypted session remaining: ${remainingMinutes} min. Devices: ${devices}. Sessions: ${sessions}. Recent installs: ${installs}. Update checks: ${updates}."
         ))
         content.addView(label("Sign out securely", 15f, Color.rgb(153, 27, 27), Typeface.BOLD).apply {
             gravity = Gravity.CENTER
