@@ -326,6 +326,220 @@ export class PostgreSqlStoreRepository {
     return result.rows[0]?.disabled === true;
   }
 
+
+  async recordVerifiedSession({ userId, externalSubject, sessionId, tokenId, devicePublicId = null, expiresAt }) {
+    const actorId = requireUuid('user-id', userId);
+    const session = String(sessionId || '');
+    const subject = String(externalSubject || '');
+    const token = String(tokenId || '');
+    const expiry = Number(expiresAt);
+    const nowSeconds = Date.now() / 1000;
+    if (session.length < 8 || session.length > 512) throw new Error('valid-session-id-required');
+    if (subject.length < 8 || subject.length > 512) throw new Error('valid-session-subject-required');
+    if (token.length < 8 || token.length > 512) throw new Error('valid-token-id-required');
+    if (!Number.isFinite(expiry) || expiry <= nowSeconds || expiry > nowSeconds + 7200) {
+      throw new Error('bounded-session-expiry-required');
+    }
+    return withActorTransaction(this.pool, actorId, async (client) => {
+      await client.query(
+        'INSERT INTO aarulya_store.store_sessions ' +
+        '(session_id, user_id, external_subject, token_id, device_public_id, expires_at) ' +
+        'VALUES ($1, $2, $3, $4, $5, to_timestamp($6::double precision)) ' +
+        'ON CONFLICT (session_id) DO UPDATE SET ' +
+        'token_id = EXCLUDED.token_id, ' +
+        'device_public_id = COALESCE(EXCLUDED.device_public_id, aarulya_store.store_sessions.device_public_id), ' +
+        'last_seen_at = now(), expires_at = EXCLUDED.expires_at ' +
+        'WHERE aarulya_store.store_sessions.user_id = EXCLUDED.user_id ' +
+        'AND aarulya_store.store_sessions.external_subject = EXCLUDED.external_subject',
+        [session, actorId, subject, token, devicePublicId ? String(devicePublicId).slice(0, 512) : null, expiry]
+      );
+      return true;
+    });
+  }
+
+  async getAccountOverview(userId, currentSessionId = null) {
+    const actorId = requireUuid('user-id', userId);
+    return withActorTransaction(this.pool, actorId, async (client) => {
+      const devices = await client.query(
+        'SELECT device_public_id, platform, integrity_state, last_seen_at, created_at ' +
+        'FROM aarulya_store.devices WHERE user_id = $1 ' +
+        'ORDER BY COALESCE(last_seen_at, created_at) DESC LIMIT 25',
+        [actorId]
+      );
+      const sessions = await client.query(
+        'SELECT s.session_id, s.device_public_id, s.first_seen_at, s.last_seen_at, s.expires_at, ' +
+        '(r.session_id IS NOT NULL) AS revoked ' +
+        'FROM aarulya_store.store_sessions s ' +
+        'LEFT JOIN aarulya_store.session_revocations r ON r.session_id = s.session_id AND r.expires_at > now() ' +
+        'WHERE s.user_id = $1 AND s.expires_at > now() - interval \'7 days\' ' +
+        'ORDER BY s.last_seen_at DESC LIMIT 25',
+        [actorId]
+      );
+      const installs = await client.query(
+        'SELECT a.name, a.package_id, v.version_code, r.installed_at, r.reported_at ' +
+        'FROM aarulya_store.install_receipts r ' +
+        'JOIN aarulya_store.app_versions v ON v.id = r.app_version_id ' +
+        'JOIN aarulya_store.apps a ON a.id = v.app_id ' +
+        'WHERE r.user_id = $1 ORDER BY r.reported_at DESC LIMIT 25',
+        [actorId]
+      );
+      const updates = await client.query(
+        'SELECT package_id, installed_version_code, decision, checked_at ' +
+        'FROM aarulya_store.update_checks WHERE user_id = $1 ' +
+        'ORDER BY checked_at DESC LIMIT 25',
+        [actorId]
+      );
+      return Object.freeze({
+        devices: devices.rows.map((row) => ({
+          deviceId: row.device_public_id,
+          platform: row.platform,
+          integrityState: row.integrity_state,
+          lastSeenAt: row.last_seen_at ? new Date(row.last_seen_at).toISOString() : null,
+          createdAt: new Date(row.created_at).toISOString()
+        })),
+        sessions: sessions.rows.map((row) => ({
+          sessionId: row.session_id,
+          deviceId: row.device_public_id,
+          current: currentSessionId != null && row.session_id === String(currentSessionId),
+          revoked: row.revoked === true,
+          firstSeenAt: new Date(row.first_seen_at).toISOString(),
+          lastSeenAt: new Date(row.last_seen_at).toISOString(),
+          expiresAt: new Date(row.expires_at).toISOString()
+        })),
+        installs: installs.rows.map((row) => ({
+          appName: row.name,
+          packageId: row.package_id,
+          versionCode: Number(row.version_code),
+          installedAt: new Date(row.installed_at).toISOString(),
+          reportedAt: new Date(row.reported_at).toISOString()
+        })),
+        updates: updates.rows.map((row) => ({
+          packageId: row.package_id,
+          installedVersionCode: Number(row.installed_version_code),
+          decision: row.decision,
+          checkedAt: new Date(row.checked_at).toISOString()
+        }))
+      });
+    });
+  }
+
+  async revokeOwnedSession({ userId, sessionId }) {
+    const actorId = requireUuid('user-id', userId);
+    const target = String(sessionId || '');
+    if (target.length < 8 || target.length > 512) throw new Error('valid-session-id-required');
+    return withActorTransaction(this.pool, actorId, async (client) => {
+      await client.query(
+        'SELECT aarulya_store.revoke_owned_store_session($1::text, $2::text)',
+        [target, 'user-account-session-revocation']
+      );
+      return Object.freeze({ revoked: true, sessionId: target });
+    });
+  }
+
+  async listDeveloperSubmissions(userId) {
+    const actorId = requireUuid('user-id', userId);
+    return withActorTransaction(this.pool, actorId, async (client) => {
+      const result = await client.query(
+        'SELECT id, app_name, package_id, category, privacy_policy_url, ownership_evidence_url, ' +
+        'state, submitted_at, created_at, updated_at ' +
+        'FROM aarulya_store.developer_submissions WHERE user_id = $1 ' +
+        'ORDER BY updated_at DESC LIMIT 50',
+        [actorId]
+      );
+      return result.rows.map((row) => Object.freeze({
+        id: String(row.id),
+        appName: row.app_name,
+        packageId: row.package_id,
+        category: row.category,
+        privacyPolicyUrl: row.privacy_policy_url,
+        ownershipEvidenceUrl: row.ownership_evidence_url,
+        state: row.state,
+        submittedAt: row.submitted_at ? new Date(row.submitted_at).toISOString() : null,
+        createdAt: new Date(row.created_at).toISOString(),
+        updatedAt: new Date(row.updated_at).toISOString()
+      }));
+    });
+  }
+
+  async createDeveloperSubmission({ userId, appName, packageId, category, privacyPolicyUrl, ownershipEvidenceUrl }) {
+    const actorId = requireUuid('user-id', userId);
+    const name = String(appName || '').trim();
+    const pkg = String(packageId || '').trim();
+    const cat = String(category || '').trim();
+    if (name.length < 2 || name.length > 120) throw Object.assign(new Error('valid-app-name-required'), { status: 400 });
+    if (!/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){2,}$/.test(pkg)) {
+      throw Object.assign(new Error('valid-package-id-required'), { status: 400 });
+    }
+    if (cat.length < 2 || cat.length > 80) throw Object.assign(new Error('valid-category-required'), { status: 400 });
+
+    const urls = [
+      ['privacy-policy', privacyPolicyUrl],
+      ['ownership-evidence', ownershipEvidenceUrl]
+    ];
+    for (const pair of urls) {
+      const label = pair[0];
+      const raw = pair[1];
+      let parsed;
+      try {
+        parsed = new URL(String(raw || ''));
+      } catch {
+        throw Object.assign(new Error(label + '-https-url-required'), { status: 400 });
+      }
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+        throw Object.assign(new Error(label + '-https-url-required'), { status: 400 });
+      }
+    }
+
+    return withActorTransaction(this.pool, actorId, async (client) => {
+      const result = await client.query(
+        'INSERT INTO aarulya_store.developer_submissions ' +
+        '(user_id, app_name, package_id, category, privacy_policy_url, ownership_evidence_url) ' +
+        'VALUES ($1, $2, $3, $4, $5, $6) ' +
+        'ON CONFLICT (user_id, package_id) DO NOTHING ' +
+        'RETURNING id, state, created_at, updated_at',
+        [actorId, name, pkg, cat, String(privacyPolicyUrl), String(ownershipEvidenceUrl)]
+      );
+      const row = result.rows[0];
+      if (!row) throw Object.assign(new Error('developer-submission-package-already-exists'), { status: 409 });
+      await client.query(
+        'INSERT INTO aarulya_store.developer_submission_events(submission_id, user_id, event_type) ' +
+        'VALUES ($1, $2, $3)',
+        [row.id, actorId, 'draft-created']
+      );
+      return Object.freeze({
+        id: String(row.id),
+        state: row.state,
+        createdAt: new Date(row.created_at).toISOString()
+      });
+    });
+  }
+
+  async submitDeveloperSubmission({ userId, submissionId }) {
+    const actorId = requireUuid('user-id', userId);
+    const id = requireUuid('submission-id', submissionId);
+    return withActorTransaction(this.pool, actorId, async (client) => {
+      const result = await client.query(
+        'UPDATE aarulya_store.developer_submissions ' +
+        'SET state = $3, submitted_at = now(), updated_at = now() ' +
+        'WHERE id = $1 AND user_id = $2 AND state = $4 ' +
+        'RETURNING id, state, submitted_at',
+        [id, actorId, 'submitted', 'draft']
+      );
+      const row = result.rows[0];
+      if (!row) throw Object.assign(new Error('developer-submission-not-draft-or-not-found'), { status: 409 });
+      await client.query(
+        'INSERT INTO aarulya_store.developer_submission_events(submission_id, user_id, event_type) ' +
+        'VALUES ($1, $2, $3)',
+        [id, actorId, 'submitted']
+      );
+      return Object.freeze({
+        id: String(row.id),
+        state: row.state,
+        submittedAt: new Date(row.submitted_at).toISOString()
+      });
+    });
+  }
+
   async createDownloadGrant({ userId, devicePublicId = null, release, requestId, idempotencyKey }) {
     const actorId = requireUuid('user-id', userId);
     const releaseId = requireUuid('release-id', release?.releaseId);
