@@ -26,6 +26,7 @@ import com.aarulya.store.install.InstallReceiptUploader
 import com.aarulya.store.install.StoreInstallCoordinator
 import com.aarulya.store.ui.AccountGateView
 import com.aarulya.store.ui.StoreHomeView
+import org.json.JSONObject
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
@@ -37,6 +38,7 @@ class MainActivity : Activity() {
     private lateinit var receiptUploader: InstallReceiptUploader
     private lateinit var apiClient: StoreApiClient
     @Volatile private var destroyed = false
+    @Volatile private var accountOverview: JSONObject? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -146,16 +148,17 @@ class MainActivity : Activity() {
             renderAccountGate("Your session expired. Sign in again.")
             return
         }
-        setContentViewSmooth(StoreHomeView(this, ::showAppDetails, session.expiresAtEpochSeconds, ::signOut).build())
+        setContentViewSmooth(StoreHomeView(this, ::showAppDetails, session.expiresAtEpochSeconds, accountOverview, ::signOut).build())
         if (!refresh) return
 
         executor.execute {
             runCatching {
                 catalogRepository.refresh(session)
                 receiptUploader.uploadPending(session)
+                accountOverview = runCatching { apiClient.getAccountOverview(session.accessToken) }.getOrNull()
             }.onSuccess {
                 onUi {
-                    setContentViewSmooth(StoreHomeView(this, ::showAppDetails, session.expiresAtEpochSeconds, ::signOut).build())
+                    setContentViewSmooth(StoreHomeView(this, ::showAppDetails, session.expiresAtEpochSeconds, accountOverview, ::signOut).build())
                     resumePendingInstallIfReady()
                 }
             }.onFailure { error ->
@@ -181,6 +184,7 @@ class MainActivity : Activity() {
         executor.execute {
             val serverRevoked = runCatching { apiClient.revokeCurrentSession(session.accessToken) }.isSuccess
             sessionStore.clear()
+            accountOverview = null
             StoreCatalog.clearAuthenticatedRemoteCatalog()
             onUi {
                 renderAccountGate(
