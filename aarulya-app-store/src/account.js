@@ -40,6 +40,10 @@ export function bindAccountUi() {
   const accountDevices = q('#accountDevices');
   const accountInstalls = q('#accountInstalls');
   const accountSessionList = q('#accountSessionList');
+  const accountPrivacyState = q('#accountPrivacyState');
+  const accountExportButton = q('#accountExportButton');
+  const accountDeletionButton = q('#accountDeletionButton');
+  const accountDeletionCancel = q('#accountDeletionCancel');
   const accountPrimary = q('#accountPrimary');
   const developerButton = q('#developerButton');
   const developerDialog = q('#developerDialog');
@@ -50,7 +54,7 @@ export function bindAccountUi() {
   const developerSubmissionsRoot = q('#developerSubmissions');
 
   let state = Object.freeze({ signedIn: false });
-  let overview = Object.freeze({ devices: [], sessions: [], installs: [], updates: [] });
+  let overview = Object.freeze({ devices: [], sessions: [], installs: [], updates: [], privacyRequests: [] });
 
   function renderSessionRows() {
     accountSessionList.replaceChildren();
@@ -104,6 +108,17 @@ export function bindAccountUi() {
     accountDevices.textContent = signedIn ? String(overview.devices?.length || 0) + ' known device(s)' : 'Sign in to load';
     accountInstalls.textContent = signedIn ? String(overview.installs?.length || 0) + ' recent install receipt(s)' : 'Sign in to load';
     accountPrimary.textContent = signedIn ? 'Sign out securely' : 'Sign in securely';
+    const activeDeletion = (overview.privacyRequests || []).find(
+      (request) => request.type === 'deletion' && request.state === 'requested'
+    );
+    accountPrivacyState.textContent = !signedIn
+      ? 'Sign in to use privacy controls.'
+      : activeDeletion
+        ? 'Account deletion requested on ' + new Date(activeDeletion.requestedAt).toLocaleString() + '.'
+        : 'No active deletion request.';
+    accountExportButton.disabled = !signedIn;
+    accountDeletionButton.hidden = !signedIn || Boolean(activeDeletion);
+    accountDeletionCancel.hidden = !signedIn || !activeDeletion;
     renderSessionRows();
 
     const developer = signedIn && state.account?.developerAccess === true;
@@ -117,14 +132,14 @@ export function bindAccountUi() {
 
   async function refresh() {
     state = Object.freeze(await sessionStatus().catch(() => ({ signedIn: false })));
-    if (!state.signedIn) overview = Object.freeze({ devices: [], sessions: [], installs: [], updates: [] });
+    if (!state.signedIn) overview = Object.freeze({ devices: [], sessions: [], installs: [], updates: [], privacyRequests: [] });
     render();
     return state;
   }
 
   async function loadOverview() {
     overview = Object.freeze(
-      await accountOverview().catch(() => ({ devices: [], sessions: [], installs: [], updates: [] }))
+      await accountOverview().catch(() => ({ devices: [], sessions: [], installs: [], updates: [], privacyRequests: [] }))
     );
     render();
   }
@@ -184,11 +199,59 @@ export function bindAccountUi() {
     try {
       await signOut();
       state = Object.freeze({ signedIn: false });
-      overview = Object.freeze({ devices: [], sessions: [], installs: [], updates: [] });
+      overview = Object.freeze({ devices: [], sessions: [], installs: [], updates: [], privacyRequests: [] });
       render();
       accountDialog.close();
     } finally {
       accountPrimary.disabled = false;
+    }
+  });
+
+  accountExportButton.addEventListener('click', async () => {
+    accountExportButton.disabled = true;
+    try {
+      const data = await requestJson('/auth/account/export');
+      const blob = new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json' });
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = href;
+      link.download = 'aarulya-store-account-export.json';
+      link.rel = 'noopener';
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(href);
+    } finally {
+      accountExportButton.disabled = false;
+    }
+  });
+
+  accountDeletionButton.addEventListener('click', async () => {
+    if (!window.confirm('This creates a deletion request. It does not silently delete the account immediately. Continue?')) return;
+    accountDeletionButton.disabled = true;
+    try {
+      await requestJson('/auth/account/deletion/request', { method: 'POST' });
+      await loadOverview();
+    } catch (error) {
+      accountPrivacyState.textContent = error.message === 'step-up-authentication-required'
+        ? 'A fresh MFA/passkey step-up is required before requesting deletion.'
+        : 'Deletion request could not be created.';
+    } finally {
+      accountDeletionButton.disabled = false;
+    }
+  });
+
+  accountDeletionCancel.addEventListener('click', async () => {
+    accountDeletionCancel.disabled = true;
+    try {
+      await requestJson('/auth/account/deletion/cancel', { method: 'POST' });
+      await loadOverview();
+    } catch (error) {
+      accountPrivacyState.textContent = error.message === 'step-up-authentication-required'
+        ? 'A fresh MFA/passkey step-up is required before cancelling this request.'
+        : 'Deletion request could not be cancelled.';
+    } finally {
+      accountDeletionCancel.disabled = false;
     }
   });
 
