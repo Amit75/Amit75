@@ -51,6 +51,14 @@ export function createProductionComposition({ env = process.env, catalog } = {})
   const authenticate = async (request, requirements) => {
     const verified = await bearer(request, requirements);
     const internalUserId = await identityRepository.resolveUser(verified.actorId);
+    await storeRepository.recordVerifiedSession({
+      userId: internalUserId,
+      externalSubject: verified.actorId,
+      sessionId: verified.sessionId,
+      tokenId: verified.tokenId,
+      devicePublicId: verified.deviceId,
+      expiresAt: verified.expiresAt
+    });
     return Object.freeze({
       ...verified,
       actorId: internalUserId,
