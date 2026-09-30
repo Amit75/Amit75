@@ -51,6 +51,24 @@ function handler({ revoked = [] } = {}) {
       stepUpVerified: true,
       expiresAt: Math.floor(NOW / 1000) + 300
     }),
+    storeRepository: {
+      getAccountOverview: async (_userId, currentSessionId) => ({
+        devices: [],
+        sessions: [{ sessionId: currentSessionId, current: true }],
+        installs: [],
+        updates: []
+      }),
+      revokeOwnedSession: async ({ sessionId }) => ({ revoked: true, sessionId }),
+      listDeveloperSubmissions: async () => [],
+      createDeveloperSubmission: async () => ({
+        id: '00000000-0000-4000-8000-000000000099',
+        state: 'draft'
+      }),
+      submitDeveloperSubmission: async ({ submissionId }) => ({
+        id: submissionId,
+        state: 'submitted'
+      })
+    },
     revokeCurrentSession: async (identity) => { revoked.push(identity.sessionId); }
   });
 }
@@ -106,4 +124,22 @@ test('same-origin logout revokes the verified current server session and clears 
   assert.equal(logout.status, 204);
   assert.deepEqual(revoked, ['session-id-0001']);
   assert.match(String(logout.headers['set-cookie']), /Max-Age=0/);
+});
+
+
+test('web account overview and developer portal require encrypted signed-in session', async () => {
+  const web = handler();
+  const codec = createWebSessionCodec(SECRET, { now: () => NOW });
+  const sealed = codec.seal({ purpose: 'web-session', accessToken: 'a'.repeat(64) }, 300);
+  const cookie = '__Host-aarulya_store_session=' + sealed;
+
+  const account = responseCapture();
+  await web(request('/auth/account/overview', { cookie }), account);
+  assert.equal(account.status, 200);
+  assert.equal(JSON.parse(account.body).sessions[0].current, true);
+
+  const developer = responseCapture();
+  await web(request('/auth/developer/submissions', { cookie }), developer);
+  assert.equal(developer.status, 200);
+  assert.deepEqual(JSON.parse(developer.body).submissions, []);
 });
