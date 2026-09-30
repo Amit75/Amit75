@@ -161,7 +161,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           mkdir -p "$RUNNER_TEMP/apk" "$RUNNER_TEMP/evidence" "$RUNNER_TEMP/secrets"
-          for secret in migrator api publisher downloads worker hmac; do
+          for secret in migrator api publisher downloads worker hmac web-session; do
             printf 'ci-only-placeholder-%s-00000000000000000000000000000000' "$secret" > "$RUNNER_TEMP/secrets/$secret"
           done
           AARULYA_STORE_BACKEND_IMAGE='example.invalid/aarulya/store@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
@@ -172,6 +172,7 @@ jobs:
           AARULYA_DOWNLOADS_DATABASE_URL_SECRET_FILE="$RUNNER_TEMP/secrets/downloads" \
           AARULYA_WORKER_DATABASE_URL_SECRET_FILE="$RUNNER_TEMP/secrets/worker" \
           AARULYA_DOWNLOAD_TOKEN_HMAC_KEY_SECRET_FILE="$RUNNER_TEMP/secrets/hmac" \
+          AARULYA_WEB_SESSION_KEY_SECRET_FILE="$RUNNER_TEMP/secrets/web-session" \
           AARULYA_APK_ARTIFACT_ROOT="$RUNNER_TEMP/apk" \
           AARULYA_EVIDENCE_ARTIFACT_ROOT="$RUNNER_TEMP/evidence" \
           AARULYA_SOURCE_COMMIT_SHA="$STORE_EXPECTED_HEAD" \
