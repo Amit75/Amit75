@@ -67,6 +67,15 @@ function handler({ revoked = [] } = {}) {
       submitDeveloperSubmission: async ({ submissionId }) => ({
         id: submissionId,
         state: 'submitted'
+      }),
+      getAccountExport: async () => ({ schemaVersion: 1, devices: [], sessions: [] }),
+      requestAccountDeletion: async () => ({
+        id: '00000000-0000-4000-8000-000000000077',
+        state: 'requested'
+      }),
+      cancelAccountDeletion: async () => ({
+        id: '00000000-0000-4000-8000-000000000077',
+        state: 'cancelled'
       })
     },
     revokeCurrentSession: async (identity) => { revoked.push(identity.sessionId); }
@@ -142,4 +151,26 @@ test('web account overview and developer portal require encrypted signed-in sess
   await web(request('/auth/developer/submissions', { cookie }), developer);
   assert.equal(developer.status, 200);
   assert.deepEqual(JSON.parse(developer.body).submissions, []);
+});
+
+
+test('web privacy export and deletion request use encrypted session and same-origin step-up controls', async () => {
+  const web = handler();
+  const codec = createWebSessionCodec(SECRET, { now: () => NOW });
+  const sealed = codec.seal({ purpose: 'web-session', accessToken: 'a'.repeat(64) }, 300);
+  const cookie = '__Host-aarulya_store_session=' + sealed;
+
+  const exported = responseCapture();
+  await web(request('/auth/account/export', { cookie }), exported);
+  assert.equal(exported.status, 200);
+  assert.equal(JSON.parse(exported.body).schemaVersion, 1);
+
+  const deletion = responseCapture();
+  await web(request('/auth/account/deletion/request', {
+    method: 'POST',
+    cookie,
+    origin: 'https://store.aarulya.com'
+  }), deletion);
+  assert.equal(deletion.status, 201);
+  assert.equal(JSON.parse(deletion.body).state, 'requested');
 });
