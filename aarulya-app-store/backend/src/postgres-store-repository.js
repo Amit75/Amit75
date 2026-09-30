@@ -389,6 +389,12 @@ export class PostgreSqlStoreRepository {
         'ORDER BY checked_at DESC LIMIT 25',
         [actorId]
       );
+      const privacyRequests = await client.query(
+        'SELECT id, request_type, state, requested_at, cancelled_at, completed_at ' +
+        'FROM aarulya_store.account_privacy_requests WHERE user_id = $1 ' +
+        'ORDER BY requested_at DESC LIMIT 25',
+        [actorId]
+      );
       return Object.freeze({
         devices: devices.rows.map((row) => ({
           deviceId: row.device_public_id,
@@ -418,6 +424,14 @@ export class PostgreSqlStoreRepository {
           installedVersionCode: Number(row.installed_version_code),
           decision: row.decision,
           checkedAt: new Date(row.checked_at).toISOString()
+        })),
+        privacyRequests: privacyRequests.rows.map((row) => ({
+          id: String(row.id),
+          type: row.request_type,
+          state: row.state,
+          requestedAt: new Date(row.requested_at).toISOString(),
+          cancelledAt: row.cancelled_at ? new Date(row.cancelled_at).toISOString() : null,
+          completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null
         }))
       });
     });
