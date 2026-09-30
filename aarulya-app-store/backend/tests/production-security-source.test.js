@@ -292,3 +292,29 @@ test('web account BFF keeps bearer tokens out of storefront JavaScript and harde
   assert.match(migration, /revoke_current_store_session/);
   assert.match(migration, /GRANT EXECUTE ON FUNCTION.*aarulya_store_api/);
 });
+
+
+test('account history and developer portal remain owner-scoped and review-gated', async () => {
+  const migration = await backend('sql/0015_account_and_developer_portal.sql');
+  const repository = await backend('src/postgres-store-repository.js');
+  const composition = await backend('src/production-composition.js');
+  const webAuth = await backend('src/web-session-auth.js');
+  const account = await store('src/account.js');
+
+  assert.match(migration, /CREATE TABLE store_sessions/);
+  assert.match(migration, /CREATE TABLE developer_submissions/);
+  assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(migration, /revoke_owned_store_session/);
+  assert.match(migration, /developer_submission_events_immutable/);
+  assert.match(repository, /recordVerifiedSession/);
+  assert.match(repository, /getAccountOverview/);
+  assert.match(repository, /revokeOwnedSession/);
+  assert.match(repository, /createDeveloperSubmission/);
+  assert.match(repository, /submitDeveloperSubmission/);
+  assert.match(composition, /recordVerifiedSession/);
+  assert.match(webAuth, /developer-role-required/);
+  assert.match(webAuth, /same-origin-mutation-required/);
+  assert.match(account, /auth\/account\/overview/);
+  assert.match(account, /Submit for review/);
+  assert.doesNotMatch(account, /access_token|Authorization:\s*Bearer/i);
+});
