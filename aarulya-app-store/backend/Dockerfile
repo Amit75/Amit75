@@ -17,6 +17,11 @@ COPY --chown=10001:10001 backend/package.json backend/package-lock.json ./
 COPY --chown=10001:10001 backend/src ./src
 COPY --chown=10001:10001 backend/sql ./sql
 COPY --chown=10001:10001 src ../src
+COPY --chown=10001:10001 index.html styles.css polish.css /app/storefront/
+COPY --chown=10001:10001 assets /app/storefront/assets
+COPY --chown=10001:10001 src /app/storefront/src
+COPY --chown=10001:10001 install /app/storefront/install
+COPY --chown=10001:10001 policies /app/storefront/policies
 USER 10001:10001
 EXPOSE 8080
 ENTRYPOINT ["node"]
