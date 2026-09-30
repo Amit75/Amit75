@@ -266,3 +266,29 @@ test('remaining external gates have fail-closed source frameworks without launch
   assert.match(devicePreflight, /INSTALL_EXECUTED=false/);
   assert.doesNotMatch(devicePreflight, /adb[^\n]*install/);
 });
+
+
+test('web account BFF keeps bearer tokens out of storefront JavaScript and hardens production routing', async () => {
+  const index = await store('index.html');
+  const account = await store('src/account.js');
+  const caddy = await store('deploy/Caddyfile');
+  const compose = await store('deploy/compose.production.yml');
+  const webAuth = await backend('src/web-session-auth.js');
+  const migration = await backend('sql/0014_self_session_revocation.sql');
+
+  assert.match(index, /id="accountButton"/);
+  assert.match(index, /id="accountDialog"/);
+  assert.match(account, /\/auth\/session/);
+  assert.match(account, /\/auth\/logout/);
+  assert.doesNotMatch(account, /access_token|Authorization:\s*Bearer/i);
+  assert.match(caddy, /handle \/auth\/\*/);
+  assert.match(caddy, /reverse_proxy api:8080/);
+  assert.match(compose, /web_session_key/);
+  assert.match(compose, /AARULYA_WEB_SESSION_KEY_FILE/);
+  assert.match(webAuth, /__Host-aarulya_store_session/);
+  assert.match(webAuth, /Secure; HttpOnly; SameSite=Lax/);
+  assert.match(webAuth, /code_challenge_method/);
+  assert.match(webAuth, /aes-256-gcm/);
+  assert.match(migration, /revoke_current_store_session/);
+  assert.match(migration, /GRANT EXECUTE ON FUNCTION.*aarulya_store_api/);
+});

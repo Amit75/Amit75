@@ -23,6 +23,7 @@
       <a href="#categories" class="ghost-link">Categories</a>
       <a href="/install?app=aarulya-store" class="ghost-link">Install Store</a>
       <button id="developerButton" class="ghost" type="button">Developer Portal</button>
+      <button id="accountButton" class="account-button" type="button">Sign in</button>
     </nav>
   </header>
 
@@ -114,11 +115,24 @@
     </article>
   </dialog>
 
+  <dialog id="accountDialog" class="dialog">
+    <article class="dialog-card account-card">
+      <header><div><p class="eyebrow">AARULYA ACCOUNT</p><h2 id="accountState">Checking secure session…</h2></div><button id="closeAccount" class="close" type="button" aria-label="Close">×</button></header>
+      <div class="account-facts">
+        <div><span>Verified roles</span><strong id="accountRoles">Checking…</strong></div>
+        <div><span>Session</span><strong id="accountSession">Checking…</strong></div>
+      </div>
+      <p>Password, OTP और bearer token storefront JavaScript में store नहीं होते। Web session Secure, HttpOnly, SameSite cookie से bound रहती है।</p>
+      <button id="accountPrimary" class="primary" type="button">Sign in securely</button>
+    </article>
+  </dialog>
+
   <dialog id="developerDialog" class="dialog">
     <article class="dialog-card">
-      <header><div><p class="eyebrow">DEVELOPER PORTAL</p><h2>Submission foundation</h2></div><button id="closeDeveloper" class="close" type="button" aria-label="Close">×</button></header>
-      <p>पहले Aarulya के first-party apps publish होंगे। बाद में approved developers signed APK, privacy policy, ownership proof और security scan के साथ submit कर सकेंगे।</p>
-      <button class="primary" type="button" disabled>External submissions अभी बंद</button>
+      <header><div><p class="eyebrow">DEVELOPER PORTAL</p><h2>Verified developer access</h2></div><button id="closeDeveloper" class="close" type="button" aria-label="Close">×</button></header>
+      <p id="developerAccessState">Sign in to verify developer access.</p>
+      <p>पहले Aarulya के first-party apps publish होंगे। External submissions तभी खुलेंगे जब developer identity, app ownership, privacy, signing और security evidence gates active हों।</p>
+      <button id="developerAction" class="primary" type="button" disabled>Developer access unavailable</button>
     </article>
   </dialog>
 

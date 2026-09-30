@@ -19,13 +19,24 @@
 
 store.aarulya.com {
     import common_security
-    root * /srv/storefront
-    encode zstd gzip
     header Content-Security-Policy "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://identity.aarulya.com; connect-src 'self' https://api.store.aarulya.com; img-src 'self' data:; style-src 'self'; script-src 'self'; upgrade-insecure-requests"
-    @immutable path /src/*
-    header @immutable Cache-Control "public, max-age=3600"
-    try_files {path} /index.html
-    file_server
+
+    handle /auth/* {
+        reverse_proxy api:8080 {
+            header_up Host {host}
+            header_up X-Forwarded-Proto https
+            header_up -X-Forwarded-Client-Cert
+        }
+    }
+
+    handle {
+        root * /srv/storefront
+        encode zstd gzip
+        @immutable path /src/*
+        header @immutable Cache-Control "public, max-age=3600"
+        try_files {path} /index.html
+        file_server
+    }
 }
 
 api.store.aarulya.com {

@@ -84,6 +84,13 @@ class StoreApiClient {
             .put("installedVersionCode", installedVersionCode)
     )
 
+    fun revokeCurrentSession(accessToken: String): JSONObject =
+        request(
+            "POST",
+            baseUri.buildUpon().appendPath("sessions").appendPath("current").appendPath("revoke").build(),
+            accessToken
+        )
+
     fun reportInstall(
         accessToken: String,
         deviceId: String,

@@ -46,6 +46,7 @@ secret_vars=(
   AARULYA_DOWNLOADS_DATABASE_URL_SECRET_FILE
   AARULYA_WORKER_DATABASE_URL_SECRET_FILE
   AARULYA_DOWNLOAD_TOKEN_HMAC_KEY_SECRET_FILE
+  AARULYA_WEB_SESSION_KEY_SECRET_FILE
 )
 
 for secret_var in "${secret_vars[@]}"; do
@@ -97,6 +98,8 @@ probe() {
 }
 
 probe 'https://store.aarulya.com/'
+auth_status="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error --connect-timeout 5 --max-time 15 'https://store.aarulya.com/auth/session')" || fail 'web-auth-session-probe-failed'
+grep -Fq '"signedIn":false' <<<"$auth_status" || fail 'web-auth-anonymous-contract-invalid'
 probe 'https://api.store.aarulya.com/health'
 probe 'https://downloads.store.aarulya.com/health'
 probe 'https://evidence.store.aarulya.com/health'

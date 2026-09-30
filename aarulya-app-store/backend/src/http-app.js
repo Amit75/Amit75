@@ -172,8 +172,19 @@ export function createHttpHandler({
         scopes: Object.freeze([...(identity.scopes || [])]),
         stepUpVerified: identity.stepUpVerified === true,
         authorizedOwner: identity.authorizedOwner === true,
+        expiresAt: identity.expiresAt,
         requestId
       });
+
+      if (method === 'POST' && pathname === '/api/v1/sessions/current/revoke') {
+        const result = await releaseRepository.revokeCurrentSession({
+          sessionId: context.sessionId,
+          subject: context.externalSubject,
+          expiresAt: context.expiresAt,
+          reason: 'user-sign-out'
+        });
+        return writeJson(response, 200, result, requestId, acceptedOrigin);
+      }
 
       if (method === 'POST' && pathname === '/api/v1/admin/releases/publish') {
         const body = await readJson(request);

@@ -217,6 +217,20 @@ export class PostgreSqlStoreRepository {
     return result.rowCount > 0;
   }
 
+  async revokeCurrentSession({ sessionId, subject, expiresAt, reason = 'user-sign-out' }) {
+    const normalizedSession = String(sessionId || '');
+    const normalizedSubject = String(subject || '');
+    const expiry = Number(expiresAt);
+    if (normalizedSession.length < 8 || normalizedSession.length > 512) throw new Error('valid-session-id-required');
+    if (normalizedSubject.length < 8 || normalizedSubject.length > 512) throw new Error('valid-session-subject-required');
+    if (!Number.isFinite(expiry)) throw new Error('valid-session-expiry-required');
+    await this.pool.query(
+      `SELECT aarulya_store.revoke_current_store_session($1::text, $2::text, to_timestamp($3::double precision), $4::text)`,
+      [normalizedSession, normalizedSubject, expiry, String(reason || 'user-sign-out').slice(0, 160)]
+    );
+    return Object.freeze({ revoked: true, sessionId: normalizedSession });
+  }
+
   async getReleaseForDownload(appId, versionCode) {
     const values = [String(appId)];
     let versionFilter = '';

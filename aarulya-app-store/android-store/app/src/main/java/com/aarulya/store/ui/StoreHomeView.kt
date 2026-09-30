@@ -27,7 +27,9 @@ import com.aarulya.store.catalog.StoreCatalog
 
 class StoreHomeView(
     private val context: Context,
-    private val onAppSelected: (StoreApp) -> Unit
+    private val onAppSelected: (StoreApp) -> Unit,
+    private val sessionExpiresAtEpochSeconds: Long,
+    private val onSignOut: () -> Unit
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var pendingSearch: Runnable? = null
@@ -304,10 +306,23 @@ class StoreHomeView(
 
     private fun renderAccountState() {
         content.addView(sectionTitle("You"))
+        val remainingMinutes = ((sessionExpiresAtEpochSeconds - System.currentTimeMillis() / 1000L) / 60L).coerceAtLeast(0L)
         content.addView(infoCard(
             "Verified account",
-            "Downloads, devices, update history and privacy controls stay bound to the signed-in account. Guest browsing remains disabled for the first release."
+            "Downloads, devices, update history and privacy controls stay bound to this encrypted session. Approximate session time remaining: ${remainingMinutes} min."
         ))
+        content.addView(label("Sign out securely", 15f, Color.rgb(153, 27, 27), Typeface.BOLD).apply {
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            background = clickableRounded(Color.rgb(254, 242, 242), 18f, Color.rgb(254, 202, 202))
+            contentDescription = "Sign out and revoke current Aarulya Store session"
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { onSignOut() }
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(14) })
     }
 
     private fun renderSearchPrompt() {

@@ -60,6 +60,7 @@ services:
       - api_database_url
       - publisher_database_url
       - download_token_hmac_key
+      - web_session_key
     environment:
       <<: *backend-environment
       PORT: "8080"
@@ -67,6 +68,9 @@ services:
       AARULYA_DATABASE_URL_FILE: /run/secrets/api_database_url
       AARULYA_PUBLISHER_DATABASE_URL_FILE: /run/secrets/publisher_database_url
       AARULYA_DOWNLOAD_TOKEN_HMAC_KEY_FILE: /run/secrets/download_token_hmac_key
+      AARULYA_WEB_SESSION_KEY_FILE: /run/secrets/web_session_key
+      AARULYA_WEB_OIDC_CLIENT_ID: aarulya-store-web
+      AARULYA_WEB_OIDC_REDIRECT_URI: https://store.aarulya.com/auth/callback
       AARULYA_DATABASE_APP_NAME: aarulya-store-api
       AARULYA_DATABASE_POOL_MAX: "10"
     healthcheck:
@@ -184,6 +188,8 @@ secrets:
     file: ${AARULYA_WORKER_DATABASE_URL_SECRET_FILE:?worker database URL secret file required}
   download_token_hmac_key:
     file: ${AARULYA_DOWNLOAD_TOKEN_HMAC_KEY_SECRET_FILE:?download token HMAC key secret file required}
+  web_session_key:
+    file: ${AARULYA_WEB_SESSION_KEY_SECRET_FILE:?web session encryption key secret file required}
 
 volumes:
   caddy_data: {}

@@ -1,3 +1,4 @@
+import { bindAccountUi } from './account.js';
 import { APP_CATALOG } from './catalog.js';
 import { STOREFRONT_SHELVES, mergeCatalog } from './storefront.js';
 
@@ -151,6 +152,7 @@ function renderCategories() {
       selectedCategory = button.dataset.category;
       renderCategories();
       renderAllApps();
+bindAccountUi();
       scrollToElement($('#allAppsSection'));
     });
   });
@@ -265,8 +267,6 @@ $('#clearSearch').addEventListener('click', () => {
 });
 $('#closeDialog').addEventListener('click', () => $('#appDialog').close());
 $('#downloadButton').addEventListener('click', openVerifiedInstallHandoff);
-$('#developerButton').addEventListener('click', () => $('#developerDialog').showModal());
-$('#closeDeveloper').addEventListener('click', () => $('#developerDialog').close());
 
 $('#catalogCount').textContent = `${ALL_APPS.length} apps catalogued`;
 renderFeatured();

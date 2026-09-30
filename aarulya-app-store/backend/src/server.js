@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { APP_CATALOG } from '../../src/catalog.js';
 import { createHttpHandler } from './http-app.js';
 import { createProductionComposition } from './production-composition.js';
+import { createWebAuthHandler } from './web-session-auth.js';
 
 const CANONICAL_API_ORIGIN = 'https://api.store.aarulya.com';
 const CANONICAL_STOREFRONT_ORIGIN = 'https://store.aarulya.com';
@@ -19,7 +20,7 @@ if (!allowedBind) throw new Error('api-bind-must-be-loopback-or-declared-private
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('valid-api-port-required');
 
 const composition = createProductionComposition({ catalog: APP_CATALOG });
-const handler = createHttpHandler({
+const apiHandler = createHttpHandler({
   service: composition.service,
   authenticate: composition.authenticate,
   releaseRepository: composition.storeRepository,
@@ -27,6 +28,21 @@ const handler = createHttpHandler({
   publicationService: composition.publicationService,
   allowedOrigins: [CANONICAL_STOREFRONT_ORIGIN]
 });
+const webAuthHandler = createWebAuthHandler({
+  authenticate: composition.authenticate,
+  revokeCurrentSession: (identity) => composition.storeRepository.revokeCurrentSession({
+    sessionId: identity.sessionId,
+    subject: identity.externalSubject,
+    expiresAt: identity.expiresAt,
+    reason: 'web-user-sign-out'
+  })
+});
+const handler = (request, response) => {
+  const pathname = new URL(request.url, CANONICAL_STOREFRONT_ORIGIN).pathname;
+  return pathname.startsWith('/auth/')
+    ? webAuthHandler(request, response)
+    : apiHandler(request, response);
+};
 
 const server = createServer(handler);
 server.requestTimeout = 15_000;

@@ -97,3 +97,17 @@ test('Store interaction avoids per-keystroke heavy rendering and provides motion
   assert.match(activity, /setDuration\(160L\)/);
   assert.match(activity, /R\.drawable\.ic_aarulya_mark/);
 });
+
+
+test('Android You tab exposes bounded session state and secure server-backed sign out', async () => {
+  const home = await source('app/src/main/java/com/aarulya/store/ui/StoreHomeView.kt');
+  const activity = await source('app/src/main/java/com/aarulya/store/MainActivity.kt');
+  const api = await source('app/src/main/java/com/aarulya/store/api/StoreApiClient.kt');
+
+  assert.match(home, /sessionExpiresAtEpochSeconds/);
+  assert.match(home, /Sign out securely/);
+  assert.match(home, /onSignOut/);
+  assert.match(activity, /apiClient\.revokeCurrentSession/);
+  assert.match(activity, /sessionStore\.clear\(\)/);
+  assert.match(api, /sessions.*current.*revoke/s);
+});

@@ -17,6 +17,7 @@ import android.widget.Toast
 import com.aarulya.store.auth.OidcPkceClient
 import com.aarulya.store.auth.SecureSessionStore
 import com.aarulya.store.auth.StoreSession
+import com.aarulya.store.api.StoreApiClient
 import com.aarulya.store.catalog.RemoteCatalogRepository
 import com.aarulya.store.catalog.StoreApp
 import com.aarulya.store.catalog.StoreCatalog
@@ -34,6 +35,7 @@ class MainActivity : Activity() {
     private lateinit var catalogRepository: RemoteCatalogRepository
     private lateinit var installCoordinator: StoreInstallCoordinator
     private lateinit var receiptUploader: InstallReceiptUploader
+    private lateinit var apiClient: StoreApiClient
     @Volatile private var destroyed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,6 +51,7 @@ class MainActivity : Activity() {
         catalogRepository = RemoteCatalogRepository()
         installCoordinator = StoreInstallCoordinator(this)
         receiptUploader = InstallReceiptUploader(this)
+        apiClient = StoreApiClient()
         handleIntent(intent)
     }
 
@@ -143,7 +146,7 @@ class MainActivity : Activity() {
             renderAccountGate("Your session expired. Sign in again.")
             return
         }
-        setContentViewSmooth(StoreHomeView(this, ::showAppDetails).build())
+        setContentViewSmooth(StoreHomeView(this, ::showAppDetails, session.expiresAtEpochSeconds, ::signOut).build())
         if (!refresh) return
 
         executor.execute {
@@ -152,7 +155,7 @@ class MainActivity : Activity() {
                 receiptUploader.uploadPending(session)
             }.onSuccess {
                 onUi {
-                    setContentViewSmooth(StoreHomeView(this, ::showAppDetails).build())
+                    setContentViewSmooth(StoreHomeView(this, ::showAppDetails, session.expiresAtEpochSeconds, ::signOut).build())
                     resumePendingInstallIfReady()
                 }
             }.onFailure { error ->
@@ -164,6 +167,26 @@ class MainActivity : Activity() {
                         Toast.makeText(this, "Store sync unavailable: ${safeError(error)}", Toast.LENGTH_LONG).show()
                     }
                 }
+            }
+        }
+    }
+
+    private fun signOut() {
+        val session = sessionStore.loadSession()
+        if (session == null) {
+            renderAccountGate("Signed out.")
+            return
+        }
+        showProgress("Signing out securely…")
+        executor.execute {
+            val serverRevoked = runCatching { apiClient.revokeCurrentSession(session.accessToken) }.isSuccess
+            sessionStore.clear()
+            StoreCatalog.clearAuthenticatedRemoteCatalog()
+            onUi {
+                renderAccountGate(
+                    if (serverRevoked) "Signed out securely on this device and server."
+                    else "Signed out on this device. Server revocation could not be confirmed; the short session will expire automatically."
+                )
             }
         }
     }
