@@ -61,7 +61,9 @@ test('web session codec is authenticated, bounded and rejects tampering', () => 
   const opened = codec.open(sealed);
   assert.equal(opened.purpose, 'web-session');
   assert.equal(opened.expiresAt, Math.floor(NOW / 1000) + 300);
-  assert.throws(() => codec.open(sealed.slice(0, -1) + (sealed.endsWith('A') ? 'B' : 'A')), /web-session-envelope-invalid/);
+  const tampered = sealed.split('.');
+  tampered[3] = (tampered[3].startsWith('A') ? 'B' : 'A') + tampered[3].slice(1);
+  assert.throws(() => codec.open(tampered.join('.')), /web-session-envelope-invalid/);
 });
 
 test('web PKCE flow keeps verifier HttpOnly and never returns bearer token to browser JSON', async () => {
