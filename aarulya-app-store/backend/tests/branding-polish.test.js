@@ -67,3 +67,16 @@ test('brand ownership manifest keeps release claims honest', async () => {
   assert.match(manifest, /Final release evidence still requires/);
   assert.match(manifest, /No legal registration or production release is claimed/);
 });
+
+
+test('storefront escapes dynamic catalog text before innerHTML rendering', async () => {
+  const app = await source('src/app.js');
+
+  assert.match(app, /function escapeHtml/);
+  assert.match(app, /replaceAll\('&', '&amp;'\)/);
+  assert.match(app, /escapeHtml\(app\.name\)/);
+  assert.match(app, /escapeHtml\(app\.description\)/);
+  assert.match(app, /escapeHtml\(app\.category\)/);
+  assert.match(app, /escapeHtml\(app\.id\)/);
+  assert.match(app, /escapeHtml\(shelf\.title\)/);
+});
