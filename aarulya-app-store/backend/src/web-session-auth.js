@@ -157,12 +157,14 @@ async function exchangeCode({ fetchImpl, config, code, verifier }) {
 export function createWebAuthHandler({
   authenticate,
   revokeCurrentSession,
+  storeRepository,
   env = process.env,
   fetchImpl = globalThis.fetch,
   now = () => Date.now()
 } = {}) {
   if (typeof authenticate !== 'function') throw new Error('web-auth-authenticator-required');
   if (typeof revokeCurrentSession !== 'function') throw new Error('web-auth-session-revoker-required');
+  if (!storeRepository) throw new Error('web-auth-store-repository-required');
   if (typeof fetchImpl !== 'function') throw new Error('web-auth-fetch-required');
   const config = configFromEnvironment(env);
   const secret = readSecret({
@@ -173,6 +175,37 @@ export function createWebAuthHandler({
     maximumBytes: 256
   });
   const codec = createWebSessionCodec(secret, { now });
+
+  async function readJsonBody(request) {
+    const contentType = String(request.headers?.['content-type'] || '').split(';')[0].trim().toLowerCase();
+    if (contentType !== 'application/json') throw webError('application-json-required', 415);
+    const chunks = [];
+    let total = 0;
+    for await (const chunk of request) {
+      total += chunk.length;
+      if (total > 64 * 1024) throw webError('request-body-too-large', 413);
+      chunks.push(chunk);
+    }
+    if (!chunks.length) return {};
+    try {
+      const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();
+      return parsed;
+    } catch {
+      throw webError('invalid-json-object', 400);
+    }
+  }
+
+  function requireSameOriginMutation(request) {
+    const origin = String(request.headers?.origin || '').replace(/\/$/, '');
+    if (origin !== STORE_ORIGIN) throw webError('same-origin-mutation-required', 403);
+  }
+
+  function requireDeveloper(identity) {
+    if (!(identity.roles || []).some((role) => ['owner','developer','publisher'].includes(role))) {
+      throw webError('developer-role-required', 403);
+    }
+  }
 
   async function verifiedIdentity(session) {
     if (!session?.accessToken) throw webError('web-session-required', 401);
@@ -244,9 +277,67 @@ export function createWebAuthHandler({
         });
       }
 
+      if (method === 'GET' && url.pathname === '/auth/account/overview') {
+        const session = codec.open(cookies[SESSION_COOKIE]);
+        const identity = await verifiedIdentity(session);
+        return writeJson(response, 200,
+          await storeRepository.getAccountOverview(identity.actorId, identity.sessionId));
+      }
+
+      const revokeOwnedMatch = method === 'POST'
+        ? url.pathname.match(/^\/auth\/account\/sessions\/([^/]+)\/revoke$/)
+        : null;
+      if (revokeOwnedMatch) {
+        requireSameOriginMutation(request);
+        const session = codec.open(cookies[SESSION_COOKIE]);
+        const identity = await verifiedIdentity(session);
+        return writeJson(response, 200, await storeRepository.revokeOwnedSession({
+          userId: identity.actorId,
+          sessionId: decodeURIComponent(revokeOwnedMatch[1])
+        }));
+      }
+
+      if (method === 'GET' && url.pathname === '/auth/developer/submissions') {
+        const session = codec.open(cookies[SESSION_COOKIE]);
+        const identity = await verifiedIdentity(session);
+        requireDeveloper(identity);
+        return writeJson(response, 200, {
+          submissions: await storeRepository.listDeveloperSubmissions(identity.actorId)
+        });
+      }
+
+      if (method === 'POST' && url.pathname === '/auth/developer/submissions') {
+        requireSameOriginMutation(request);
+        const session = codec.open(cookies[SESSION_COOKIE]);
+        const identity = await verifiedIdentity(session);
+        requireDeveloper(identity);
+        const body = await readJsonBody(request);
+        return writeJson(response, 201, await storeRepository.createDeveloperSubmission({
+          userId: identity.actorId,
+          appName: body.appName,
+          packageId: body.packageId,
+          category: body.category,
+          privacyPolicyUrl: body.privacyPolicyUrl,
+          ownershipEvidenceUrl: body.ownershipEvidenceUrl
+        }));
+      }
+
+      const submitMatch = method === 'POST'
+        ? url.pathname.match(/^\/auth\/developer\/submissions\/([0-9a-f-]{36})\/submit$/i)
+        : null;
+      if (submitMatch) {
+        requireSameOriginMutation(request);
+        const session = codec.open(cookies[SESSION_COOKIE]);
+        const identity = await verifiedIdentity(session);
+        requireDeveloper(identity);
+        return writeJson(response, 200, await storeRepository.submitDeveloperSubmission({
+          userId: identity.actorId,
+          submissionId: submitMatch[1]
+        }));
+      }
+
       if (method === 'POST' && url.pathname === '/auth/logout') {
-        const origin = String(request.headers?.origin || '').replace(/\/$/, '');
-        if (origin !== STORE_ORIGIN) throw webError('same-origin-logout-required', 403);
+        requireSameOriginMutation(request);
         if (cookies[SESSION_COOKIE]) {
           try {
             const session = codec.open(cookies[SESSION_COOKIE]);
