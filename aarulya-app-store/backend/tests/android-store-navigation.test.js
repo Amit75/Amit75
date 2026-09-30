@@ -111,3 +111,17 @@ test('Android You tab exposes bounded session state and secure server-backed sig
   assert.match(activity, /sessionStore\.clear\(\)/);
   assert.match(api, /sessions.*current.*revoke/s);
 });
+
+
+test('Android account surface consumes owner-scoped history without exposing bearer state', async () => {
+  const activity = await source('app/src/main/java/com/aarulya/store/MainActivity.kt');
+  const api = await source('app/src/main/java/com/aarulya/store/api/StoreApiClient.kt');
+  const home = await source('app/src/main/java/com/aarulya/store/ui/StoreHomeView.kt');
+
+  assert.match(api, /getAccountOverview/);
+  assert.match(api, /account.*overview/s);
+  assert.match(activity, /accountOverview/);
+  assert.match(activity, /apiClient\.getAccountOverview/);
+  assert.match(home, /Recent installs/);
+  assert.match(home, /Update checks/);
+});
