@@ -540,6 +540,79 @@ export class PostgreSqlStoreRepository {
     });
   }
 
+
+  async getPrivacyRequests(userId) {
+    const actorId = requireUuid('user-id', userId);
+    return withActorTransaction(this.pool, actorId, async (client) => {
+      const result = await client.query(
+        'SELECT id, request_type, state, requested_at, cancelled_at, completed_at ' +
+        'FROM aarulya_store.account_privacy_requests WHERE user_id = $1 ' +
+        'ORDER BY requested_at DESC LIMIT 25',
+        [actorId]
+      );
+      return result.rows.map((row) => Object.freeze({
+        id: String(row.id),
+        type: row.request_type,
+        state: row.state,
+        requestedAt: new Date(row.requested_at).toISOString(),
+        cancelledAt: row.cancelled_at ? new Date(row.cancelled_at).toISOString() : null,
+        completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null
+      }));
+    });
+  }
+
+  async getAccountExport(userId, currentSessionId = null) {
+    const actorId = requireUuid('user-id', userId);
+    const [overview, submissions, privacyRequests] = await Promise.all([
+      this.getAccountOverview(actorId, currentSessionId),
+      this.listDeveloperSubmissions(actorId),
+      this.getPrivacyRequests(actorId)
+    ]);
+    return Object.freeze({
+      schemaVersion: 1,
+      generatedAt: new Date().toISOString(),
+      devices: overview.devices,
+      sessions: overview.sessions.map(({ sessionId: _sessionId, ...session }) => session),
+      installs: overview.installs,
+      updateChecks: overview.updates,
+      developerSubmissions: submissions,
+      privacyRequests
+    });
+  }
+
+  async requestAccountDeletion(userId) {
+    const actorId = requireUuid('user-id', userId);
+    return withActorTransaction(this.pool, actorId, async (client) => {
+      const created = await client.query(
+        'SELECT aarulya_store.request_account_deletion() AS id'
+      );
+      const id = created.rows[0]?.id;
+      if (!id) throw new Error('account-deletion-request-create-failed');
+      const result = await client.query(
+        'SELECT id, state, requested_at FROM aarulya_store.account_privacy_requests WHERE id = $1',
+        [id]
+      );
+      const row = result.rows[0];
+      return Object.freeze({
+        id: String(row.id),
+        state: row.state,
+        requestedAt: new Date(row.requested_at).toISOString()
+      });
+    });
+  }
+
+  async cancelAccountDeletion(userId) {
+    const actorId = requireUuid('user-id', userId);
+    return withActorTransaction(this.pool, actorId, async (client) => {
+      const cancelled = await client.query(
+        'SELECT aarulya_store.cancel_account_deletion_request() AS id'
+      );
+      const id = cancelled.rows[0]?.id;
+      if (!id) throw new Error('account-deletion-request-cancel-failed');
+      return Object.freeze({ id: String(id), state: 'cancelled' });
+    });
+  }
+
   async createDownloadGrant({ userId, devicePublicId = null, release, requestId, idempotencyKey }) {
     const actorId = requireUuid('user-id', userId);
     const releaseId = requireUuid('release-id', release?.releaseId);
