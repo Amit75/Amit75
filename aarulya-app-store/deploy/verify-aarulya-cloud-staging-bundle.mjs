@@ -4,7 +4,7 @@ import process from 'node:process';
 
 const DIGEST=/^sha256:[a-f0-9]{64}$/;
 const SHA40=/^[a-f0-9]{40}$/;
-const IMAGE=/^[a-z0-9][a-z0-9._/-]*(?::[a-z0-9._-]+)?@sha256:[a-f0-9]{64}$/i;
+const IMAGE=/^(?:sha256:[a-f0-9]{64}|[a-z0-9][a-z0-9._/-]*(?::[a-z0-9._-]+)?@sha256:[a-f0-9]{64})$/i;
 
 const raw=String(process.env.AARULYA_STAGING_BUNDLE_FILE||'').trim();
 if(!raw) throw new Error('AARULYA_STAGING_BUNDLE_FILE_REQUIRED');
