@@ -9,12 +9,14 @@ PASSWORD_FILE="$SECRET_DIR/postgres-password"
 DB_NAME="aarulya_store_staging"
 DB_USER="aarulya_store_staging"
 DB_CONTAINER="aarulya-store-private-db"
+DB_SECRET="aarulya-store-private-postgres-password"
 DB_VOLUME="aarulya-store-private-db-data"
 NETWORK="aarulya-store-private-preview-v1"
 PREVIEW="aarulya-store-private-preview-edge"
 IMAGE="docker.io/library/postgres:17.10-bookworm@sha256:9b18b78397054fce88a9552e9d5a3ad5bb7fd258c5b3cc1c5028e46373d6ea8f"
 CREATED_VOLUME=false
 CREATED_CONTAINER=false
+CREATED_SECRET=false
 CREATED_PASSWORD=false
 PHASE="preflight"
 
@@ -22,11 +24,14 @@ fail() { printf 'STAGING_DATABASE=BLOCKED\nREASON=%s\n' "$1" >&2; exit 2; }
 cleanup() {
   rc=$?
   if ((rc != 0)); then
-    if [[ "$CREATED_CONTAINER" == true ]]; then
+    if [[ "$CREATED_VOLUME" == true ]] && podman container exists "$DB_CONTAINER"; then
       podman rm --force "$DB_CONTAINER" >/dev/null 2>&1 || true
     fi
     if [[ "$CREATED_VOLUME" == true ]]; then
       podman volume rm "$DB_VOLUME" >/dev/null 2>&1 || true
+    fi
+    if [[ "$CREATED_SECRET" == true ]]; then
+      podman secret rm "$DB_SECRET" >/dev/null 2>&1 || true
     fi
     if [[ "$CREATED_PASSWORD" == true ]]; then
       rm -f -- "$PASSWORD_FILE"
@@ -49,6 +54,7 @@ podman container exists "$PREVIEW" || fail "store-private-preview-not-found"
 
 if podman container exists "$DB_CONTAINER"; then fail "database-container-already-exists"; fi
 if podman volume exists "$DB_VOLUME"; then fail "database-volume-already-exists"; fi
+if podman secret exists "$DB_SECRET"; then fail "database-podman-secret-already-exists"; fi
 if [[ -e "$PASSWORD_FILE" ]]; then fail "database-password-file-already-exists"; fi
 
 if [[ -e "$SECRET_DIR" ]]; then
@@ -71,6 +77,12 @@ CREATED_PASSWORD=true
 chmod 600 "$PASSWORD_FILE"
 [[ "$(stat -c '%a' "$PASSWORD_FILE")" == 600 ]] || fail "secret-file-mode-invalid"
 printf 'STAGING_DATABASE_CREDENTIAL=CREATED_SERVER_ONLY\n'
+
+PHASE="podman-secret"
+# Podman delivers this staging-only secret mounted for uid 999, without
+# exposing the 0600 host file to a different user or to container inspect.
+podman secret create "$DB_SECRET" "$PASSWORD_FILE" >/dev/null
+CREATED_SECRET=true
 
 PHASE="dedicated-volume"
 podman volume create "$DB_VOLUME" >/dev/null
@@ -97,7 +109,7 @@ podman run --detach --pull=never \
   --env "POSTGRES_DB=$DB_NAME" \
   --env "POSTGRES_PASSWORD_FILE=/run/secrets/postgres-password" \
   --env "POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256" \
-  --mount "type=bind,src=$PASSWORD_FILE,dst=/run/secrets/postgres-password,ro" \
+  --secret "$DB_SECRET,type=mount,target=/run/secrets/postgres-password,uid=999,gid=999,mode=0400" \
   --volume "$DB_VOLUME:/var/lib/postgresql/data:U" \
   "$IMAGE" >/dev/null
 CREATED_CONTAINER=true
