@@ -7,7 +7,7 @@ This provides a **staging-only PostgreSQL container**, separate from AARULYA Clo
 - Requires the existing rootless internal network `aarulya-store-private-preview-v1` and running Storefront preview.
 - Pulls the immutable `postgres:17.10-bookworm` image pinned to the digest already used by Store GitHub Actions.
 - Creates a **dedicated** rootless Podman named volume and a container named `aarulya-store-private-db`. Does not publish any host ports, join Cloud Docker networks or alter Cloud configuration.
-- Creates one staging-only random database credential on the server in `/home/admin1/.local/share/aarulya-store-staging/secrets/postgres-password`, with restrictive directory and file permissions. Never share or commit this secret.
+- Creates one staging-only random database credential on the server in `/home/admin1/.local/share/aarulya-store-staging/secrets/postgres-password`, with restrictive directory and file permissions. Podman also imports it as a per-user secret mounted only for container UID 999; it is never exposed in container environment or a root-readable bind mount. Never share or commit this secret.
 - Initializes only `aarulya_store_staging`. Does **not** run migrations, grant API access, activate signing keys or create production records.
 - On failure attempts to clean up only resources it newly created. Does not remove or replace resources that existed before invocation.
 
