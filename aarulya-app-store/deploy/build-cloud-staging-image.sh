@@ -35,10 +35,15 @@ fi
 TAG="localhost/aarulya-store-staging:${EXPECTED:0:12}"
 "$ENGINE" build   --build-arg "SOURCE_SHA=$EXPECTED"   --label "org.opencontainers.image.revision=$EXPECTED"   --tag "$TAG"   --file "$DOCKERFILE"   "$STORE_ROOT"
 
-IMAGE_ID="$("$ENGINE" image inspect "$TAG" --format '{{.Id}}' | tr '[:upper:]' '[:lower:]')"
-[[ "$IMAGE_ID" =~ ^sha256:[a-f0-9]{64}$ ]] || fail 'immutable-local-image-id-invalid'
+IMAGE_ID_RAW="$("$ENGINE" image inspect "$TAG" --format '{{.Id}}' | tr '[:upper:]' '[:lower:]')"
+# Rootless Podman emits a bare 64-hex image ID; Docker usually prefixes sha256:.
+# Canonicalize both formats without relaxing the immutable digest requirement.
+[[ "$IMAGE_ID_RAW" =~ ^(sha256:)?[a-f0-9]{64}$ ]] || fail 'immutable-local-image-id-invalid'
+IMAGE_ID="sha256:${IMAGE_ID_RAW#sha256:}"
 
-REVISION="$("$ENGINE" image inspect "$IMAGE_ID" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+# Query the verified immutable image via the just-built local tag. This works
+# across Podman and Docker even when a runtime rejects a digest-form ID lookup.
+REVISION="$("$ENGINE" image inspect "$TAG" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
 [[ "$REVISION" == "$EXPECTED" ]] || fail 'image-source-label-mismatch'
 
 OUTPUT="${AARULYA_STAGING_IMAGE_ENV_OUTPUT:-/var/lib/aarulya-cloud/staging/aarulya-store/image.env}"
