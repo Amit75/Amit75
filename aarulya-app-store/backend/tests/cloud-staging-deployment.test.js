@@ -49,6 +49,8 @@ test('staging image builder requires exact clean source and rootless immutable i
   assert.match(builder, /exact-source-head-mismatch/);
   assert.match(builder, /tracked-source-not-clean/);
   assert.match(builder, /org\.opencontainers\.image\.revision/);
-  assert.match(builder, /IMAGE_ID.*\^sha256:/);
+  assert.ok(builder.includes('[[ "$IMAGE_ID_RAW" =~ ^(sha256:)?[a-f0-9]{64}$ ]]'));
+  assert.ok(builder.includes('IMAGE_ID="sha256:${IMAGE_ID_RAW#sha256:}"'));
+  // Runtime behaviour is exercised in staging-image-id.test.js for both Podman and Docker forms.
   assert.match(builder, /PRODUCTION_DEPLOYED=false/);
 });
