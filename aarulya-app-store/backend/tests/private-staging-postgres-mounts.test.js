@@ -7,7 +7,8 @@ const deploymentScript = new URL('../../deploy/start-private-postgres.sh', impor
 test('Postgres tmpfs options are Podman-compatible without uid/gid overrides', async () => {
   const script = await readFile(deploymentScript, 'utf8');
   const mounts = script.split('\n').filter((line) => line.includes('--tmpfs '));
-  assert.equal(mounts.length, 2, 'expected /tmp and PostgreSQL socket tmpfs');
+  assert.equal(mounts.length, 3, 'expected /tmp, PostgreSQL socket and secret-mount tmpfs');
+  assert.ok(mounts.some((line) => line.includes('/run/secrets:rw,nosuid,nodev,noexec,mode=0755,size=1m')), 'read-only rootfs requires writable secret mountpoint');
   assert.ok(mounts.some((line) => line.includes('/var/run/postgresql:')));
   for (const line of mounts) {
     assert.doesNotMatch(line, /(?:[:,])(?:uid|gid)=\d+/, 'Podman tmpfs cannot use uid/gid mount overrides');
