@@ -75,9 +75,9 @@ PHASE=verify-volume
 timeout 60 podman run --rm --pull=never --network=none \
   --read-only --cap-drop=ALL --security-opt=no-new-privileges \
   --user 999:999 \
-  --volume "$VOL:/inspect:ro" \
+  --volume "$VOL:/var/lib/postgresql/data:ro" \
   --entrypoint /bin/sh "$IMAGE" \
-  -ec 'test -z "$(ls -A /inspect)"' \
+  -ec 'test -z "$(ls -A /var/lib/postgresql/data)"' \
   || fail "existing-staging-volume-is-not-empty"
 echo "UNINITIALIZED_VOLUME=PASS"
 
