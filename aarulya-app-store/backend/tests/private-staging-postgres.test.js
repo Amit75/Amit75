@@ -27,7 +27,9 @@ test('private database image and password are isolated, pinned and least privile
   assert.match(s, /--auth-host=scram-sha-256/);
   assert.match(s, /openssl rand -hex 32 > "\$PASSWORD_FILE"/);
   assert.match(s, /chmod 600 "\$PASSWORD_FILE"/);
-  assert.match(s, /--mount "type=bind,src=\$PASSWORD_FILE,dst=\/run\/secrets\/postgres-password,ro"/);
+  assert.match(s, /podman secret create "\$DB_SECRET" "\$PASSWORD_FILE"/);
+  assert.match(s, /--secret "\$DB_SECRET,type=mount,target=\/run\/secrets\/postgres-password,uid=999,gid=999,mode=0400"/);
+  assert.doesNotMatch(s, /--mount "type=bind,src=\$PASSWORD_FILE/);
   assert.match(s, /--volume "\$DB_VOLUME:\/var\/lib\/postgresql\/data:U"/);
   assert.doesNotMatch(s, /POSTGRES_PASSWORD=[^_]|\btrust\b|--env-file/);
 });
@@ -38,6 +40,8 @@ test('private DB startup fails closed and disclaims migration or production acce
   assert.match(s, /database-volume-already-exists/);
   assert.match(s, /database-password-file-already-exists/);
   assert.match(s, /CREATED_VOLUME/);
+  assert.match(s, /CREATED_SECRET/);
+  assert.match(s, /database-podman-secret-already-exists/);
   assert.match(s, /CREATED_CONTAINER/);
   assert.match(s, /CREATED_PASSWORD/);
   assert.match(s, /staging-postgres-not-ready/);
