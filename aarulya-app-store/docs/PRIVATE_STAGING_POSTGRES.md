@@ -43,3 +43,9 @@ FINAL_EXIT_CODE=0
 ## Intentional boundaries
 
 No shell command should run against the existing Docker `aarulya-cloud-nonprod-postgres-1` container as part of this isolated staging. The private DB is accessible only to containers connected to the rootless internal network. Do not use production secrets, account data, APK signing keys or payment credentials in this environment.
+
+## Recovery from an OCI read-only secret mount failure
+
+On rootless Podman the read-only root filesystem can prevent runc from creating a secret file mountpoint inside `/run/secrets`. The startup script now mounts a separate writable, noexec tmpfs at `/run/secrets` while keeping the application root filesystem read-only. The secret remains a 0400 Podman file mount, never an environment variable.
+
+**If a previous attempt failed before PostgreSQL started**, use `deploy/recover-created-private-postgres.sh` only after confirming its exact GitHub source. It requires the original Store-only database container to be in `created` state, verifies its identity, checks the existing named volume is completely empty, and runs a one-shot network-disabled Podman secret mount smoke test. Only after all checks pass does it remove *the failed container metadata*, retaining the named volume, Podman secret and password file, and recreate that one container with the fixed tmpfs option. Any unrecognized or non-empty volume blocks recovery, without deletion. No migration or authenticated API is started. Never manually remove a staging volume or secret to make a check pass.
