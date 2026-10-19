@@ -24,17 +24,21 @@ fail() { printf 'STAGING_DATABASE=BLOCKED\nREASON=%s\n' "$1" >&2; exit 2; }
 cleanup() {
   rc=$?
   if ((rc != 0)); then
-    if [[ "$CREATED_VOLUME" == true ]] && podman container exists "$DB_CONTAINER"; then
-      podman rm --force "$DB_CONTAINER" >/dev/null 2>&1 || true
-    fi
-    if [[ "$CREATED_VOLUME" == true ]]; then
-      podman volume rm "$DB_VOLUME" >/dev/null 2>&1 || true
-    fi
-    if [[ "$CREATED_SECRET" == true ]]; then
-      podman secret rm "$DB_SECRET" >/dev/null 2>&1 || true
-    fi
-    if [[ "$CREATED_PASSWORD" == true ]]; then
-      rm -f -- "$PASSWORD_FILE"
+    # Once Podman has created the DB container, preserve volume/secret and
+    # credentials for safe diagnosis; never delete partially initialized data.
+    if podman container exists "$DB_CONTAINER" 2>/dev/null; then
+      printf 'STAGING_PARTIAL_RESOURCES_PRESERVED=true\n'
+      printf 'MANUAL_REVIEW_REQUIRED=true\n'
+    else
+      if [[ "$CREATED_VOLUME" == true ]]; then
+        podman volume rm "$DB_VOLUME" >/dev/null 2>&1 || true
+      fi
+      if [[ "$CREATED_SECRET" == true ]]; then
+        podman secret rm "$DB_SECRET" >/dev/null 2>&1 || true
+      fi
+      if [[ "$CREATED_PASSWORD" == true ]]; then
+        rm -f -- "$PASSWORD_FILE"
+      fi
     fi
   fi
   printf 'FINAL_EXIT_CODE=%s\nLAST_PHASE=%s\nPRODUCTION_MUTATION=NONE\n' "$rc" "$PHASE"
@@ -99,7 +103,7 @@ podman run --detach --pull=never \
   --read-only \
   --user 999:999 \
   --tmpfs /tmp:rw,nosuid,nodev,size=64m \
-  --tmpfs /var/run/postgresql:rw,nosuid,nodev,uid=999,gid=999,mode=3775,size=32m \
+  --tmpfs /var/run/postgresql:rw,nosuid,nodev,mode=1777,size=32m \
   --cap-drop=ALL \
   --security-opt=no-new-privileges \
   --pids-limit=128 \
