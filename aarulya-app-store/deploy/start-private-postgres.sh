@@ -104,6 +104,7 @@ podman run --detach --pull=never \
   --user 999:999 \
   --tmpfs /tmp:rw,nosuid,nodev,size=64m \
   --tmpfs /var/run/postgresql:rw,nosuid,nodev,mode=1777,size=32m \
+  --tmpfs /run/secrets:rw,nosuid,nodev,noexec,mode=0755,size=1m \
   --cap-drop=ALL \
   --security-opt=no-new-privileges \
   --pids-limit=128 \
