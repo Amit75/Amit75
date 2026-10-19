@@ -21,7 +21,7 @@ test('recovery rejects initialized data and validates readonly secret before con
   const s = await readFile(recoveryPath, 'utf8');
   assert.match(s, /s\.get\("Status"\)=="created"/);
   assert.match(s, /UNINITIALIZED_VOLUME=PASS/);
-  assert.match(s, /-ec 'test -z "\$\(ls -A \/inspect\)"/);
+  assert.match(s, /-ec 'test -z "\$\(ls -A \/var\/lib\/postgresql\/data\)"/);
   assert.match(s, /SECRET_READONLY_MOUNT_SMOKE=PASS/);
   assert.match(s, /--tmpfs \/run\/secrets:rw,nosuid,nodev,noexec,mode=0755,size=1m/);
   assert.ok(s.indexOf('echo "SECRET_READONLY_MOUNT_SMOKE=PASS"') < s.indexOf('podman rm "$DB"'));
