@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "projectId": "aarulya-store",
+  "projectName": "Aarulya Store",
+  "repository": "Amit75/Amit75",
+  "authoritativeBranch": "agent/aarulya-app-store-foundation",
+  "pullRequest": 2,
+  "humanOwner": {"ownerId":"amit-kumar","name":"Amit Kumar","githubLogin":"Amit75","role":"SOLE_HUMAN_OWNER_AND_FINAL_AUTHORITY"},
+  "controlPlane": "AARULYA_CLOUD",
+  "dataAuthority": "AARULYA",
+  "database": {"name":"aarulya_store","isolation":"DEDICATED_DATABASE","ownerControlled":true,"encryptionAtRest":true,"rowLevelSecurityRequired":true},
+  "objectStorage": {"namespace":"products/aarulya-store","ownerControlled":true,"encryptionAtRest":true,"immutableBackupRequired":true},
+  "namespaces": {"queue":"products.aarulya-store","secrets":"products/aarulya-store"},
+  "signing": {"privateKeysInRepository":false,"ownerCustodyRequired":true,"offlineSigningSupported":true},
+  "integration": {"directCrossProductDatabaseAccess":false,"mode":"VERSIONED_AUTHENTICATED_API_OR_EVENT_ONLY"},
+  "distribution": {"store":"AARULYA_STORE","packageId":"com.aarulya.store"},
+  "backup": {"encrypted":true,"immutable":true,"offlineCopy":true,"ownerRestoreRequired":true},
+  "externalTelemetryEnabled": false,
+  "currentState": {"sourceStatus":"ACTIVE_DEVELOPMENT","remainingGates":"Exact-head verification, Android build, signing, security, device and production acceptance"}
+}

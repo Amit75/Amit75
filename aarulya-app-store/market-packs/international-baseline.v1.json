@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0.0",
+  "packId": "aarulya-store-international-baseline",
+  "state": "FRAMEWORK_ONLY",
+  "launchApproved": false,
+  "defaultCountryState": "BLOCKED",
+  "crossBorderTransferDefault": "BLOCKED",
+  "productionPaymentsDefault": false,
+  "perCountryLegalReviewRequired": true,
+  "ownerApprovalRequired": true,
+  "requiredEvidence": [
+    "verified-legal-operator",
+    "privacy-and-data-protection-mapping",
+    "hosting-residency-and-cross-border-decision",
+    "consumer-terms-and-refund-review",
+    "tax-invoice-and-payment-review",
+    "child-safety-age-and-advertising-review",
+    "content-and-distribution-restrictions",
+    "security-and-incident-obligations",
+    "support-and-dispute-channel",
+    "effective-date",
+    "professional-review-evidence",
+    "owner-approval-bound-to-pack-digest"
+  ],
+  "approvedCountries": []
+}
